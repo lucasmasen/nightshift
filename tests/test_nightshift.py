@@ -672,6 +672,25 @@ class LockTests(unittest.TestCase):
         self.assertIn("waiting", msgs[0])
 
 
+class PreflightTests(unittest.TestCase):
+    def test_offline_copy_is_self_contained(self):
+        from nightshift import config, preflight
+        night = Path(__file__).resolve().parent.parent / "runs" / "2026-11-16-184822"
+        if not (night / "summary.json").exists():
+            self.skipTest("no local night to copy")
+        with tempfile.TemporaryDirectory() as d:
+            old = preflight.OFFLINE
+            preflight.OFFLINE = Path(d) / "offline"
+            try:
+                index = preflight.build_offline([night])
+                page = (preflight.OFFLINE / night.name / "stage.html").read_text()
+                self.assertIn("stage.html", index.read_text())
+                self.assertNotIn("http://", page.replace("http://www.w3.org", ""))
+                self.assertIn("NOTES=", page)  # rehearse notes are in the offline copy (it stays on this Mac)
+            finally:
+                preflight.OFFLINE = old
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve
