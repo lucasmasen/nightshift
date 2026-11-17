@@ -82,7 +82,7 @@ def real_call_story() -> str:
     return ""
 
 
-def landing(nights: list[str]) -> str:
+def landing(nights: list[str], story: str | None = None) -> str:
     """The front page: what Nightshift is, the best night's numbers, and links to its stage view, report and video."""
     import html
     import json
@@ -136,7 +136,7 @@ main{{max-width:860px;margin:0 auto;padding:64px 16px}} h1{{font-size:clamp(40px
 With no grader for someone else's agent, the HarnessRouter agent does the triage too: it reads every call, decides
 which went wrong and why, then makes the fix. On a made-up dental office's AI it caught both planted mistakes (a
 "the dentist will call you back tonight" nobody could keep, and a medicine dose) for about 9 cents.</p>
-{real_call_story()}
+{real_call_story() if story is None else story}
 <h2 style="margin-top:34px">What's real, and what isn't yet</h2>
 <ul>
 <li><b>Real:</b> the fixes. A Claude Code agent on HarnessRouter wrote every change shown here; nothing was hand-edited.</li>
@@ -179,6 +179,7 @@ def build(nights: list[str]) -> tuple[Path, list[str]]:
         keep.append(name)
     # The dashboard lists only the exported nights.
     real_runs = config.RUNS
+    story = real_call_story()  # before narrowing RUNS: real-call nights aren't exported, only their counts are
     try:
         tmp = SITE / ".runs"
         tmp.mkdir()
@@ -187,7 +188,7 @@ def build(nights: list[str]) -> tuple[Path, list[str]]:
             shutil.copy(real_runs / name / "summary.json", tmp / name / "summary.json")
         config.RUNS = tmp
         (SITE / "nights.html").write_text(dashboard.render())
-        (SITE / "index.html").write_text(landing(keep))
+        (SITE / "index.html").write_text(landing(keep, story))
     finally:
         config.RUNS = real_runs
         shutil.rmtree(SITE / ".runs", ignore_errors=True)
