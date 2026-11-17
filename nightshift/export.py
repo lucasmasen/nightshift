@@ -74,7 +74,7 @@ def landing(nights: list[str]) -> str:
                 f"<div><b>{s.get('p_value', 0):.0%}</b><span>chance it's luck</span></div></div>"
                 f"<p class='links'><a href='{html.escape(n)}/stage.html'>Watch the night (6 slides)</a> · "
                 f"<a href='{html.escape(n)}/report.html'>Full report</a>"
-                + (f" · <a href='{html.escape(n)}/demo.mp4'>Video</a>" if (config.RUNS / n / "demo.mp4").exists() else "")
+                + (f" · <a href='{html.escape(n)}/demo.mp4'>Video</a>" if (SITE / n / "demo.mp4").exists() else "")
                 + " · <a href='nights.html'>Every night</a></p>")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nightshift</title><style>
