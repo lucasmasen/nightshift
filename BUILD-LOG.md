@@ -52,5 +52,12 @@ Mandarin one as a conflict with an existing rule instead of forcing a fix. But o
 as non-emergencies. So Nightshift now refuses any fix where one case drops by 2 or more, whatever the total says.
 That's the point of the proof step: the agent is good, not always right.
 
+**Real-call mode (7:15pm).** Nightshift can now start from the demo line's real calls instead of simulated ones:
+read-only from Vapi, flagged by heuristics, phone numbers, names and addresses scrubbed before anything leaves the
+Mac. The last 14 days: 5 real calls, all flagged. The agent fixed 2 causes in 2 lines ("bye now" before the caller
+said goodbye, which hangs up; claiming to "have a name" for who calls back) and pushed back on the rest: several flags
+were the heuristic's mistakes, and it said why. Real calls can't be replayed, so the proof runs on the simulator
+cases that test the same behavior. Proof runs tomorrow.
+
 **Next.** Full run of every case on night 1's fix (tomorrow, fresh $2 budget), then night 2 again with the
 cut-hand lesson in the instructions.
