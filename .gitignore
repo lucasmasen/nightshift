@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 approved/
 site/
+.deploy/
+.vercel-keep/

@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import collect, config, cost, dashboard, export, fixer, guard, realcalls, report, retest, stage, stats, video
+from . import collect, config, cost, dashboard, export, fixer, guard, ops, realcalls, report, retest, stage, stats, video
 from .hr import Client, HRError
 
 
@@ -299,6 +299,19 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--guards", type=int, default=3)
     ex = sub.add_parser("export", help="Build site/ (public static copy) from the named nights; never deploys")
     ex.add_argument("nights", nargs="+")
+    vf = sub.add_parser("verify", help="Run every case once with a night's fix and compare with its baseline (~$0.90)")
+    vf.add_argument("dir")
+    sub.add_parser("publish", help="Export every real night and deploy the public site (Vercel)")
+    cd = sub.add_parser("card", help="1080x1350 post image for a night")
+    cd.add_argument("dir")
+    cd.add_argument("--day", type=int)
+    ar = sub.add_parser("arena", help="Same failures, several harnesses, one proof (needs a key for each)")
+    ar.add_argument("dir")
+    ar.add_argument("--bases", default="claude-code,codex")
+    ar.add_argument("--repeat", type=int, default=4)
+    gl = sub.add_parser("golive", help="Put an approved, verified fix on the real phone line (a person runs this)")
+    gl.add_argument("dir")
+    gl.add_argument("--really", action="store_true")
     vd = sub.add_parser("video", help="Silent captioned demo video of one night (demo.mp4)")
     vd.add_argument("dir")
     st = sub.add_parser("stage", help="Build the 6-slide demo view for one night")
@@ -343,6 +356,31 @@ def main(argv: list[str] | None = None) -> int:
         site, issues = export.build(a.nights)
         log(f"Built {site}" + ("" if not issues else "\nHeld back (fix before publishing):\n  " + "\n  ".join(issues)))
         return 0 if not issues else 1
+    if a.cmd == "verify":
+        try:
+            ok = ops.verify(Path(a.dir), log=log)["ok_to_go_live"]
+        except retest.Refused as e:
+            log(f"Refused by the $2/day cap: {e}")
+            return 1
+        dashboard.write()
+        return 0 if ok else 1
+    if a.cmd == "publish":
+        ops.publish(log=log)
+        return 0
+    if a.cmd == "card":
+        log(str(ops.card(Path(a.dir), a.day)))
+        return 0
+    if a.cmd == "arena":
+        res = ops.arena(Path(a.dir), [b.strip() for b in a.bases.split(",") if b.strip()], a.repeat, log=log)
+        b = res.get("before", {})
+        log(f"Before: {b.get('passed')}/{b.get('total')}")
+        for base, e in res["entries"].items():
+            af = e.get("after") or {}
+            log(f"  {base:12} {e.get('model')}: after {af.get('passed', '-')}/{af.get('total', '-')}, "
+                f"{e.get('changed_lines')} lines, ~${e.get('est_cost_usd') or 0:.2f}" + (f", REJECTED {e['guard']}" if e["guard"] else ""))
+        return 0
+    if a.cmd == "golive":
+        return ops.golive(Path(a.dir), a.really, log=log)
     if a.cmd == "video":
         log(str(video.build(Path(a.dir))))
         return 0

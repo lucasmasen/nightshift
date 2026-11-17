@@ -355,3 +355,23 @@ class CostTests(unittest.TestCase):
         out = "Paid calls: 32, estimated $0.16, measured $0.200 from tokens (0.63¢ a call)."
         self.assertEqual(cost.sim_cost(out), 0.2)
         self.assertEqual(cost.sim_cost("Paid calls: 4, estimated $0.02. Reused: 0"), 0.02)
+
+
+class OpsTests(unittest.TestCase):
+    def test_golive_needs_approval_and_verify(self):
+        from nightshift import ops
+        with tempfile.TemporaryDirectory() as d:
+            n = Path(d) / "night"
+            n.mkdir()
+            (n / "summary.json").write_text(json.dumps({"verdict": "Ready for approval"}))
+            msgs = []
+            self.assertEqual(ops.golive(n, really=True, log=msgs.append), 1)
+            self.assertIn("Not approved", msgs[-1])
+            (n / "summary.json").write_text(json.dumps({"approved": {"file": "x"}, "verify": {"ok_to_go_live": False}}))
+            self.assertEqual(ops.golive(n, really=True, log=msgs.append), 1)
+            self.assertIn("Not verified", msgs[-1])
+
+    def test_clip(self):
+        from nightshift import ops
+        self.assertEqual(ops._clip("one two three four", 9), "one two…")
+        self.assertEqual(ops._clip("short", 9), "short")
