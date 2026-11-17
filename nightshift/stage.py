@@ -97,7 +97,7 @@ h1{{font-size:clamp(40px,6vw,84px);line-height:1.05;margin:16px 0}} h2{{font-siz
 button.done{{background:var(--c)}} .hint{{position:fixed;bottom:14px;right:18px;color:var(--mute);font-size:14px}}
 @media(max-width:700px){{.row{{grid-template-columns:1fr;}} .n{{text-align:left}}}}
 </style></head><body>
-<section class="on"><div class="k">Last night</div><h1>Godfrey took {total} calls.</h1><div class="big">{total - passed}</div>
+<section class="on"><div class="k">{"Real calls" if s.get("mode") == "real" else "Last night"}</div><h1>Godfrey took {total} {"real " if s.get("mode") == "real" else ""}calls.</h1><div class="big">{total - passed}</div>
 <h2 class="mute">went wrong. Nobody was awake to notice.</h2></section>
 <section><div class="k">One of them · {html.escape(case)}</div><div class="call">{"".join(f"<div>{_line(x)}</div>" for x in lines)}</div>
 <div class="why">Graded fail: {html.escape(why[:240])}{"…" if len(why) > 240 else ""}</div></section>
