@@ -109,6 +109,18 @@ main{{max-width:860px;margin:0 auto;padding:64px 16px}} h1{{font-size:clamp(40px
 With no grader for someone else's agent, the HarnessRouter agent does the triage too: it reads every call, decides
 which went wrong and why, then makes the fix. On a made-up dental office's AI it caught both planted mistakes (a
 "the dentist will call you back tonight" nobody could keep, and a medicine dose) for about 9 cents.</p>
+<h2 style="margin-top:34px">What's real, and what isn't yet</h2>
+<ul>
+<li><b>Real:</b> the fixes. A Claude Code agent on HarnessRouter wrote every change shown here; nothing was hand-edited.</li>
+<li><b>Real:</b> the scores, measured by re-running calls. But the callers are <b>simulated</b> (an AI playing a caller,
+graded by code checks and a judge model), not people on phones.</li>
+<li><b>Real:</b> the safety check, the luck estimate, and the Approve button. Nothing has gone live on the phone line.</li>
+<li><b>New, not yet proven:</b> real calls. Nightshift reads the demo line's real calls (names and numbers scrubbed),
+but so far only a handful exist, all made by me.</li>
+<li><b>New, not yet proven:</b> running by itself. The 2am schedule was switched on Nov 17; the first unattended
+nights are Nov 18 to 20.</li>
+<li><b>Not yet:</b> anyone else's agent in production. The any-agent mode was tested on a made-up dental office.</li>
+</ul>
 <div class="foot">Built by Lucas for The Big Hack Game (Berkeley), Nov 2026. Agent: Godfrey, an after-hours AI receptionist for plumbers; demo shop Sunset Plumbing is made up. Scores are simulated calls.</div>
 </main></body></html>"""
 
