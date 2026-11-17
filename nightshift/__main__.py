@@ -86,15 +86,30 @@ def night(args: argparse.Namespace) -> int:
         log("1. Calls: simulating tonight's calls with the current prompt...")
         base = retest.run_suite(args.cases, repeat=1, log=log).run
         log(f"   {base.passed} of {base.total} passed")
+    # Stacking: build on an approved night's prompt and skip the cases it already fixed.
+    stack_prompt, skip, builds_on = None, set(), None
+    if args.on_top_of:
+        prev = Path(args.on_top_of)
+        ps = dashboard.load(prev)
+        if not ps.get("approved"):
+            log(f"Not starting: {prev.name} isn't approved.")
+            return 1
+        stack_prompt = (prev / "prompt.proposed.md").read_text()
+        skip = set(ps.get("failed_cases", [])) | set(ps.get("skipped_cases", []))
+        builds_on = prev.name
+        log(f"   building on approved night {prev.name}; skipping the cases it fixed: {', '.join(sorted(skip))}")
     counts: dict[str, int] = {}
     for c in base.failures:
+        if c.case in skip:
+            continue
         counts[c.case] = counts.get(c.case, 0) + 1
     # Fix the cases that failed most first; a few per night keeps the fix small and the re-test cheap.
     failed = sorted(sorted(counts, key=lambda c: -counts[c])[:max(1, args.max_cases)])
     if len(counts) > len(failed):
         log(f"   {len(counts)} cases failed; tonight fixes the {len(failed)} that failed most (--max-cases)")
     summary: dict = {"date": stamp, "agent": "Godfrey (Sunset Plumbing demo line)", "baseline_passed": base.passed,
-                     "baseline_total": base.total, "baseline_file": base.path.name, "baseline_path": str(base.path.resolve()), "failed_cases": failed}
+                     "baseline_total": base.total, "baseline_file": base.path.name, "baseline_path": str(base.path.resolve()), "failed_cases": failed,
+                     "builds_on": builds_on, "skipped_cases": sorted(skip)}
     if not failed:
         summary["verdict"] = "Clean night: every call passed. Nothing to fix."
         return finish(out, summary)
@@ -103,7 +118,7 @@ def night(args: argparse.Namespace) -> int:
     tonight = collect.Run(base.path, base.passed, base.total, [c for c in base.calls if c.case in failed or c.passed])
     failures_md.write_text(collect.failures_markdown(tonight))
     prompt_now = out / "prompt.before.md"
-    prompt_now.write_text(retest.current_prompt())
+    prompt_now.write_text(stack_prompt if stack_prompt is not None else retest.current_prompt())
     shop = config.TEST_CHECKOUT / config.SHOP_REL
 
     # 2. The fix.
@@ -200,6 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("cases", nargs="*", help="Cases to simulate tonight (default: all)")
     n.add_argument("--from-run", help="Use an existing suite run file instead of simulating tonight's calls")
     n.add_argument("--base", help="Harness base: claude-code (default) or codex")
+    n.add_argument("--on-top-of", help="An approved night to build on: use its fixed prompt, skip the cases it fixed")
     n.add_argument("--mock", action="store_true", help="Local stand-in for the HarnessRouter agent ($0)")
     n.add_argument("--no-retest", action="store_true", help="Stop after the safety check (no simulated calls)")
     n.add_argument("--repeat", type=int, default=4, help="Calls per case in the before/after re-test (default 3)")

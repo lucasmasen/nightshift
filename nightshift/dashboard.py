@@ -32,7 +32,13 @@ def approve(night_dir: Path, by: str, force: bool = False) -> tuple[bool, str]:
     if not (night_dir / "prompt.proposed.md").exists():
         return False, "No proposed prompt in this night."
     real = config.WORKSPACE / "demo-factory" / config.PROMPT_REL
-    before = night_dir / "prompt.before.md"
+    root = night_dir  # a stacked night's chain must start from the current real prompt
+    for _ in range(20):
+        parent = load(root).get("builds_on")
+        if not parent:
+            break
+        root = night_dir.parent / parent
+    before = root / "prompt.before.md"
     if real.exists() and before.exists() and real.read_text() != before.read_text():
         return False, ("The real prompt changed since this night ran, so this fix was made against an old version. "
                        "Run a new night instead of approving this one.")
