@@ -11,20 +11,40 @@ import re
 from pathlib import Path
 
 
+HIGH_STAKES = ("alert_fails", "gas", "burst_pipe", "burst_pipe_night", "no_water", "in_an_hour_flooding")
+
+
 def first_failure(failures_md: str) -> tuple[str, str, list[str]]:
-    """(case, why, a few transcript lines) from the first failed call in failures.md."""
-    m = re.search(r"^## 1\. (\S+) \(FAIL\)\n\*\*Why it failed:\*\* (.*?)\n\n(.*?)(?=^## 2\.|\Z)", failures_md, re.M | re.S)
-    if not m:
+    """(case, why, up to 9 transcript lines) for the slide: a high-stakes failure if there is one, else the first.
+    Long calls are trimmed to start at the first failed tool, where the story is."""
+    sections = re.findall(r"^## \d+\. (\S+) \(FAIL\)\n\*\*Why it failed:\*\* (.*?)\n\n(.*?)(?=^## \d+\.|\Z)",
+                          failures_md, re.M | re.S)
+    if not sections:
         return "", "", []
-    lines = [ln[2:] for ln in m.group(3).splitlines() if ln.startswith("- ")]
-    return m.group(1), m.group(2).strip(), lines[:9]
+    pick = next((x for x in sections if x[0] in HIGH_STAKES), sections[0])
+    lines = [ln[2:] for ln in pick[2].splitlines() if ln.startswith("- ")]
+    err = next((i for i, ln in enumerate(lines) if "**error**" in ln), None)
+    quotes = [q for q in re.findall(r'"([^"]{8,})"', pick[1])]
+    marked = [("!" if any(q[:40] in ln for q in quotes) else "") + ln for ln in lines]
+    if sum(m.startswith("!") for m in marked) >= 2 and len(marked) > 9:
+        # Keep the story: the bad lines, the failed tool, and what the caller said right before each bad line.
+        keep = set()
+        for i, m in enumerate(marked):
+            if m.startswith("!") or "**error**" in m:
+                keep.add(i)
+                if i and marked[i - 1].startswith("**Caller"):
+                    keep.add(i - 1)
+        marked = [m for i, m in enumerate(marked) if i in keep]
+    return pick[0], pick[1].strip(), marked[:9]
 
 
 def _line(raw: str) -> str:
-    raw = html.escape(raw)
+    hot = raw.startswith("!")
+    raw = html.escape(raw[1:] if hot else raw)
     raw = re.sub(r"\*\*(Godfrey|Caller):\*\*", r"<b class='\1'>\1</b>", raw)
     raw = re.sub(r"`\[(\w+)\]`", r"<span class='tool'>\1</span>", raw)
-    return raw
+    raw = raw.replace("**error**", "<b class='err'>error</b>")
+    return f"<span class='hot'>{raw}</span>" if hot else raw
 
 
 def _diff(diff: str) -> str:
@@ -68,7 +88,7 @@ h1{{font-size:clamp(40px,6vw,84px);line-height:1.05;margin:16px 0}} h2{{font-siz
 .big{{font-size:clamp(90px,16vw,220px);font-weight:900;color:var(--g);line-height:1}} .mute{{color:var(--mute)}}
 .call{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 26px;font-size:19px;max-width:1000px}}
 .call div{{margin:6px 0}} .Godfrey{{color:var(--c)}} .Caller{{color:var(--mute)}} .tool{{font:15px ui-monospace,monospace;color:var(--g)}}
-.why{{color:var(--r);font-size:22px;margin-top:18px}}
+.why{{color:var(--r);font-size:22px;margin-top:18px}} .hot{{background:#3f2020;border-radius:6px;padding:2px 4px}} .err{{color:var(--r)}}
 .diff{{font:18px/1.5 ui-monospace,Menlo,monospace;background:var(--card);border-radius:14px;padding:18px 22px;white-space:pre-wrap;max-width:1100px}}
 .add{{background:#1f3a25;color:#bfe9c1}} .del{{background:#3f2020;color:#f3c1b8;text-decoration:line-through}} .ctx{{color:var(--mute)}}
 .row{{display:grid;grid-template-columns:260px 1fr 1fr 130px;gap:14px;align-items:center;margin:10px 0;font-size:18px}}
@@ -81,7 +101,7 @@ button.done{{background:var(--c)}} .hint{{position:fixed;bottom:14px;right:18px;
 <section class="on"><div class="k">Last night</div><h1>Godfrey took {total} calls.</h1><div class="big">{total - passed}</div>
 <h2 class="mute">went wrong. Nobody was awake to notice.</h2></section>
 <section><div class="k">One of them · {html.escape(case)}</div><div class="call">{"".join(f"<div>{_line(x)}</div>" for x in lines)}</div>
-<div class="why">Graded fail: {html.escape(why[:220])}</div></section>
+<div class="why">Graded fail: {html.escape(why[:240])}{"…" if len(why) > 240 else ""}</div></section>
 <section><div class="k">2am</div><h1>Nightshift hands the failures to an agent on HarnessRouter.</h1>
 <h2 class="mute">It traces each one to the instruction that caused it and makes the smallest fix.</h2>
 <div class="mute">{html.escape(where)}{spend} · harness {html.escape(str(t.get("harness_id", "")))}</div></section>
