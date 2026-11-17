@@ -508,6 +508,16 @@ class NightlyMailTests(unittest.TestCase):
         self.assertIn("fixed &lt;it&gt;", body)
         self.assertIn("127.0.0.1:8765/night/2026-11-18-020000", body)
 
+    def test_real_call_story_in_email(self):
+        from nightshift import mail
+        item = {"title": "Real calls", "night": "2026-11-18-020000", "summary": {
+            "mode": "real", "baseline_total": 3, "baseline_passed": 1, "verdict": "Ready for approval: 5/8 to 8/8",
+            "twin_tests": ["real_20261118_abc123"], "agent_summary": {"summary": "stopped the number loop"}}}
+        _, text, _ = mail.render([item], "2026-11-18")
+        self.assertIn("3 real calls to the demo line, 2 went wrong.", text)
+        self.assertIn("real_20261118_abc123", text)
+        self.assertIn("stopped the number loop", text)
+
     def test_send_without_gmail_saves_file(self):
         import os
         from nightshift import config, mail

@@ -48,6 +48,12 @@ def render(items: list[dict], date: str) -> tuple[str, str, str]:
         body_lines = _diff_lines(s.get("diff", ""), limit=10_000)
         n_changed = max(sum(d.startswith("+") for d in body_lines), sum(d.startswith("-") for d in body_lines))
         diff = ([f"What it changed: {what}"] if what else []) + ([f"{n_changed} lines of the instructions changed."] if n_changed else [])
+        if s.get("mode") == "real":
+            total = s.get("baseline_total", 0)
+            wrong = total - s.get("baseline_passed", 0)
+            diff.insert(0, f"{total} real call{'' if total == 1 else 's'} to the demo line, {wrong} went wrong.")
+            if s.get("twin_tests"):
+                diff.append("New permanent test(s) from those calls: " + ", ".join(s["twin_tests"]) + ".")
         if s.get("approved"):
             diff.append(f"Already approved by {s['approved'].get('by')}.")
         text += [f"## {i['title']}", verdict] + ([score] if score else []) + diff + (
