@@ -57,7 +57,15 @@ def render(night: dict) -> str:
         intro = (f"Nightshift's agent read {night.get('baseline_total', 0)} calls against the instructions and judged "
                  f"{wrong} went wrong. There's no simulator for this agent, so the fix isn't re-tested: read the "
                  "change and the agent's reasons below, then compare the next batch of calls.")
+        rp = night.get("replay") or {}
         retest_html = ""
+        if rp.get("cases"):
+            rows_r = "".join(f"<tr><td>{html.escape(c['id'])}</td><td>{c['old_bad']}/{c['samples']}</td>"
+                             f"<td>{c['new_bad']}/{c['samples']}</td></tr>" for c in rp["cases"])
+            retest_html = (f"<h2>Replay of the bad moments</h2><div class='card'><table><tr><th>Call</th>"
+                           f"<th>Mistake came back, old instructions</th><th>New instructions</th></tr>{rows_r}</table>"
+                           f"<div class='sub'>{html.escape(rp.get('verdict', ''))} Agent model: "
+                           f"{html.escape(str(rp.get('agent_model', '')))}. {html.escape(rp.get('limit', ''))}</div></div>")
     else:
         intro = (f"{night.get('baseline_passed', 0)} of {night.get('baseline_total', 0)} simulated calls passed overnight; "
                  f"{nfail} kind{'' if nfail == 1 else 's'} of call failed and got a fix. Nightshift proposed a fix and "

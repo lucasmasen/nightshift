@@ -248,14 +248,25 @@ def agent_night(args: argparse.Namespace) -> int:
     problems = anyagent.safety_problems(a, fix.prompt) if fix.prompt != a.prompt else []
     summary["guard_problems"] = problems
     log("3. Safety check: " + ("passed" if not problems else "REJECTED: " + " | ".join(problems)))
+    if diff and not problems and not args.mock and not getattr(args, "no_replay", False):
+        from . import replay
+        cases = replay.cases_from_report(fix.report, {c["id"]: c["transcript"] for c in a.calls})
+        try:
+            summary["replay"] = replay.run(a.prompt, fix.prompt, cases, log=log,
+                                           agent_model=a.model or replay.DEFAULT_AGENT_MODEL)
+            log("4. " + summary["replay"]["verdict"])
+        except (RuntimeError, ValueError) as e:
+            log(f"4. Replay skipped: {e}")
     if not diff:
         summary["verdict"] = f"No change: the agent found nothing the instructions could fix ({wrong} of {reviewed} calls went wrong)."
     elif problems:
         summary["verdict"] = "Nightshift's fix was rejected by the safety check."
     else:
+        rp = summary.get("replay") or {}
         summary["verdict"] = (f"Proposed, not proven: {wrong} of {reviewed} calls went wrong and the fix passed the safety "
-                              "check, but there's no simulator for this agent, so it can't be re-tested before and after. "
-                              "Review the diff, then compare tomorrow night's calls.")
+                              "check. There's no full test suite for this agent. "
+                              + (rp["verdict"] + " " if rp.get("verdict") else "")
+                              + "Review the diff, then compare tomorrow night's calls.")
     return finish(out, summary)
 
 
@@ -362,6 +373,7 @@ def main(argv: list[str] | None = None) -> int:
     ag = sub.add_parser("agent", help="Any voice agent: a folder with prompt.md + calls/ transcripts (see anyagent.py)")
     ag.add_argument("dir")
     ag.add_argument("--mock", action="store_true", help="No HarnessRouter call, no spend")
+    ag.add_argument("--no-replay", action="store_true", help="Skip the replay check (~$0.20 per bad call)")
     ag.add_argument("--base", help="Harness base: claude-code (default) or codex")
     vf = sub.add_parser("verify", help="Run every case once with a night's fix and compare with its baseline (~$0.90)")
     vf.add_argument("dir")

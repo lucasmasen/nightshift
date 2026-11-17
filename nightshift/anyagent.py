@@ -62,6 +62,7 @@ class AgentDir:
     calls: list[dict]  # {"id", "transcript", "problem"}
     facts: str
     protect: list[re.Pattern]
+    model: str = ""  # the model the agent runs on (model.txt), used to replay its bad moments
 
     @property
     def name(self) -> str:
@@ -92,7 +93,8 @@ def load(path: Path) -> AgentDir:
     protect = [re.compile(ln.strip(), re.I) for ln in protect_file.read_text().splitlines()
                if ln.strip() and not ln.startswith("#")] if protect_file.is_file() else []
     facts = (path / "facts.md").read_text() if (path / "facts.md").is_file() else ""
-    return AgentDir(path, prompt_file.read_text(), calls, facts, protect)
+    model = (path / "model.txt").read_text().strip() if (path / "model.txt").is_file() else ""
+    return AgentDir(path, prompt_file.read_text(), calls, facts, protect, model)
 
 
 def calls_markdown(a: AgentDir) -> str:

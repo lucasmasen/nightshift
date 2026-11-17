@@ -531,6 +531,38 @@ class NightlyMailTests(unittest.TestCase):
         self.assertIn("Didn't run", nightly._item("x", 1, "boom\nlast line", None)["note"])
 
 
+class ReplayTests(unittest.TestCase):
+    def test_cases_from_report(self):
+        from nightshift import replay
+        report = ("# r\n## Calls that went wrong\n### Call 02-x\nBad moment: \"the dentist will call you back tonight.\"\n"
+                  "Nobody can be paged.\n### Call 09-missing\nBad moment: \"not in any transcript\"\n"
+                  "## Calls judged fine\n### Call 01\nBad moment: \"ignored\"\n")
+        calls = {"02-x": "Ava: Hi.\nCaller: my face is swollen\nAva: Ok, the dentist will call you back tonight.\n",
+                 "09-missing": "Ava: Hi.\n", "01": "Ava: Hi.\nAva: ignored\n"}
+        cases = replay.cases_from_report(report, calls)
+        self.assertEqual([c["id"] for c in cases], ["02-x"])
+        self.assertEqual(cases[0]["context"], "Ava: Hi.\nCaller: my face is swollen")
+        self.assertIn("Nobody can be paged", cases[0]["why"])
+
+    def test_verdicts(self):
+        import subprocess
+        from nightshift import replay
+
+        def fake(old_bad, new_bad):
+            out = json.dumps({"cases": [{"id": "a", "samples": 6, "old_bad": old_bad, "new_bad": new_bad}], "usage": {}})
+            return lambda *a, **k: subprocess.CompletedProcess(a, 0, out, "")
+        real = subprocess.run
+        try:
+            subprocess.run = fake(0, 0)
+            self.assertIn("can't tell", replay.run("o", "n", [{"id": "a"}], log=lambda m: None)["verdict"])
+            subprocess.run = fake(6, 0)
+            self.assertIn("came back 6/6", replay.run("o", "n", [{"id": "a"}], log=lambda m: None)["verdict"])
+            subprocess.run = fake(2, 3)
+            self.assertIn("not better", replay.run("o", "n", [{"id": "a"}], log=lambda m: None)["verdict"])
+        finally:
+            subprocess.run = real
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve
