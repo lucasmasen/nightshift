@@ -47,7 +47,8 @@ def current_prompt() -> str:
     return (config.TEST_CHECKOUT / config.PROMPT_REL).read_text()
 
 
-def run_suite(cases: list[str], prompt_text: str | None = None, repeat: int = 1, log=print) -> Result:
+def run_suite(cases: list[str], prompt_text: str | None = None, repeat: int = 1, log=print,
+              fresh: bool = False) -> Result:
     """Run the given cases (all if empty) with prompt_text swapped in, or the checkout's prompt if None."""
     problems = checkout_ok()
     if problems:
@@ -57,6 +58,10 @@ def run_suite(cases: list[str], prompt_text: str | None = None, repeat: int = 1,
     cmd = [str(config.PYTHON), "-m", "demo_line.suite", *cases, "--repeat", str(repeat)]
     if repeat > 1:
         cmd.append("--exact")  # same number of calls before and after, so the scores compare fairly
+    if fresh:
+        # Never reuse earlier results: the failed calls that started the night would otherwise count in "before",
+        # and since they were picked for failing, "before" would look worse than it is (11/16 lesson).
+        cmd.append("--fresh")
     try:
         if prompt_text is not None:
             target.write_text(prompt_text)

@@ -125,32 +125,38 @@ def night(args: argparse.Namespace) -> int:
         summary["verdict"] = "Nightshift's fix was rejected by the safety check, so nothing was re-tested."
         return finish(out, summary)
 
-    # 4. Prove it: the same cases, same number of calls, before and after.
+    # 4. Prove it: the same cases, same number of fresh calls, before and after.
     if args.no_retest:
         summary["verdict"] = "Fix proposed and passed the safety check (not re-tested: --no-retest)."
         return finish(out, summary)
     cases = failed + pick_guard_cases(base, failed, args.guards)
-    log(f"4. Re-test: {len(cases)} cases x {args.repeat} calls, before and after")
     try:
-        before = retest.run_suite(cases, repeat=args.repeat, log=log).run
-        after = retest.run_suite(cases, fix.prompt, repeat=args.repeat, log=log).run
+        prove(summary, cases, old, fix.prompt, args.repeat)
     except retest.Refused as e:
         summary["verdict"] = f"Fix proposed, but the re-test was refused by the $2/day simulator cap: {e}"
-        return finish(out, summary)
-    summary.update(before=score_dict(before), after=score_dict(after))
-    fb = sum(before.case_scores().get(c, (0, 0))[0] for c in failed)
-    fa = sum(after.case_scores().get(c, (0, 0))[0] for c in failed)
-    broke = [c for c in cases if c not in failed
-             and after.case_scores().get(c, (0, 1))[0] < before.case_scores().get(c, (0, 0))[0]]
-    summary["broke"] = broke
-    if after.passed > before.passed and not broke:
-        v = f"Ready for approval: {before.passed}/{before.total} to {after.passed}/{after.total} on the re-run."
-    elif after.passed > before.passed:
-        v = f"Better overall ({before.passed} to {after.passed}), but it made {', '.join(broke)} worse. Review before approving."
-    else:
-        v = f"Not better ({before.passed} to {after.passed} of {after.total}). Don't approve; Nightshift will try again."
-    summary["verdict"] = v + f" Failed cases alone: {fb} to {fa} passes."
     return finish(out, summary)
+
+
+def prove(summary: dict, cases: list[str], old: str, new: str, repeat: int) -> None:
+    """Fresh calls, same cases, same count, before and after; sets before/after/broke/verdict on summary."""
+    failed = summary.get("failed_cases", [])
+    log(f"4. Re-test: {len(cases)} cases x {repeat} fresh calls, before and after")
+    before = retest.run_suite(cases, old, repeat=repeat, log=log, fresh=True).run
+    after = retest.run_suite(cases, new, repeat=repeat, log=log, fresh=True).run
+    summary.update(before=score_dict(before), after=score_dict(after), retest_repeat=repeat)
+    bc, ac = before.case_scores(), after.case_scores()
+    worse = [c for c in cases if ac.get(c, (0, 1))[0] < bc.get(c, (0, 0))[0]]
+    summary["broke"] = [c for c in worse if c not in failed]
+    summary["worse"] = worse
+    gain = after.passed - before.passed
+    if gain >= 2 and not summary["broke"]:
+        v = f"Ready for approval: {before.passed}/{before.total} to {after.passed}/{after.total} on fresh re-runs."
+    elif gain > 0:
+        v = (f"Slightly better ({before.passed} to {after.passed} of {after.total}), too small to trust at this "
+             f"sample size" + (f"; worse on {', '.join(worse)}" if worse else "") + ". Review before approving.")
+    else:
+        v = f"Not better on fresh re-runs ({before.passed} to {after.passed} of {after.total}). Don't approve."
+    summary["verdict"] = v
 
 
 def finish(out: Path, summary: dict) -> int:
@@ -179,14 +185,18 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--base", help="Harness base: claude-code (default) or codex")
     n.add_argument("--mock", action="store_true", help="Local stand-in for the HarnessRouter agent ($0)")
     n.add_argument("--no-retest", action="store_true", help="Stop after the safety check (no simulated calls)")
-    n.add_argument("--repeat", type=int, default=3, help="Calls per case in the before/after re-test (default 3)")
+    n.add_argument("--repeat", type=int, default=4, help="Calls per case in the before/after re-test (default 3)")
     n.add_argument("--max-cases", type=int, default=5, help="Most failed cases to fix in one night (default 5)")
-    n.add_argument("--guards", type=int, default=6, help="Already-passing cases re-run to catch regressions")
+    n.add_argument("--guards", type=int, default=3, help="Already-passing cases re-run to catch regressions")
     ap = sub.add_parser("approve", help="Human gate: save a night's fix as approved (never puts it live)")
     ap.add_argument("dir")
     ap.add_argument("--by", default="lucas")
     ap.add_argument("--force", action="store_true")
     sub.add_parser("dashboard", help="Rebuild runs/index.html")
+    rt = sub.add_parser("retest", help="Re-run the before/after proof for a night that already has a fix")
+    rt.add_argument("dir")
+    rt.add_argument("--repeat", type=int, default=4)
+    rt.add_argument("--guards", type=int, default=3)
     st = sub.add_parser("stage", help="Build the 6-slide demo view for one night")
     st.add_argument("dir")
     r = sub.add_parser("report")
@@ -213,6 +223,17 @@ def main(argv: list[str] | None = None) -> int:
         log(msg)
         dashboard.write()
         return 0 if ok else 1
+    if a.cmd == "retest":
+        d = Path(a.dir)
+        summ = dashboard.load(d)
+        base = collect.parse(config.TEST_CHECKOUT / "demo_line" / "suite_runs" / summ["baseline_file"])
+        cases = summ["failed_cases"] + pick_guard_cases(base, summ["failed_cases"], a.guards)
+        summ.pop("approved", None)
+        try:
+            prove(summ, cases, (d / "prompt.before.md").read_text(), (d / "prompt.proposed.md").read_text(), a.repeat)
+        except retest.Refused as e:
+            summ["verdict"] = f"Re-test refused by the $2/day simulator cap: {e}"
+        return finish(d, summ)
     if a.cmd == "stage":
         log(str(stage.write(Path(a.dir))))
         return 0

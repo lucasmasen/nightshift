@@ -60,6 +60,12 @@ class CollectTests(unittest.TestCase):
         self.assertIn("hello two", run.calls[2].transcript)
         self.assertEqual(run.case_scores(), {"book_basic": (2, 2), "book_earliest": (0, 1)})
 
+    def test_reused_rows_count(self):
+        text = RUN.replace("| book_earliest | FAIL", "| book_earliest (reused) | FAIL")
+        with tempfile.TemporaryDirectory() as d:
+            run = collect.parse(write(Path(d), "r.md", text))
+        self.assertEqual(run.case_scores()["book_earliest"], (0, 1))
+
     def test_failures_markdown_has_reason_and_transcript(self):
         with tempfile.TemporaryDirectory() as d:
             md = collect.failures_markdown(collect.parse(write(Path(d), "r.md", RUN)))

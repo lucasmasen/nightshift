@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 HEADLINE = re.compile(r"\*\*(\d+) of (\d+) passed\.\*\*")
-ROW = re.compile(r"^\| ([a-z0-9_]+) \| (PASS|FAIL)[^|]* \| (.*) \|\s*$")
+ROW = re.compile(r"^\| ([a-z0-9_]+)(?: \(reused\))? \| (PASS|FAIL)[^|]* \| (.*) \|\s*$")
 BLOCK = re.compile(r"^### ([a-z0-9_]+) \((PASS|FAIL)[^)]*\)\s*$")
 
 
