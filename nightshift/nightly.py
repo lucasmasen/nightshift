@@ -33,6 +33,18 @@ def ensure_server(port: int = 8765, log=print) -> None:
     log(f"Started the web app on http://127.0.0.1:{port} for the Approve links")
 
 
+def pending_proofs() -> list[Path]:
+    """Nights with a fix that passed the safety check but were never re-tested (e.g. made after the day's test
+    budget ran out). The nightly run proves these first, so a fix never waits on someone remembering to."""
+    out = []
+    for d, s in dashboard.nights():
+        if (s.get("diff") and not s.get("guard_problems") and not s.get("after") and s.get("mode") != "agent"
+                and (s.get("trace") or {}).get("where") != "mock" and not s.get("rejected")
+                and (s.get("retest_cases") or s.get("failed_cases"))):
+            out.append(d)
+    return out
+
+
 def latest_approved() -> Path | None:
     for d, s in dashboard.nights():  # newest first
         if s.get("approved") and s.get("mode") not in ("real", "agent"):
@@ -64,6 +76,14 @@ def run(real_days: int = 1, max_cases: int = 4, send_email: bool = True, log=pri
     date = datetime.now().strftime("%Y-%m-%d")
     log(f"Nightshift nightly {datetime.now():%Y-%m-%d %H:%M}")
     items: list[dict] = []
+
+    for d in pending_proofs():
+        code, out, _ = _run(["retest", str(d), "--repeat", "4"], log)
+        if code == 2:
+            items.append({"title": f"Proof of an earlier fix ({d.name})", "night": d.name, "summary": None,
+                          "note": "Skipped: today's $2 test budget was already used. It runs on the next one."})
+        else:
+            items.append(_item(f"Proof of an earlier fix ({d.name})", code, out, d if code == 0 else None))
 
     code, out, night = _run(["night", "--real-days", str(real_days), "--new-only", "--max-cases", "3", "--guards", "2"], log)
     if night and (json.loads((night / "summary.json").read_text()).get("baseline_total") or 0) == 0:

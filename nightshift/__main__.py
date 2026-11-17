@@ -308,8 +308,8 @@ def prove(summary: dict, cases: list[str], old: str, new: str, repeat: int) -> N
     """Fresh calls, same cases, same count, before and after; sets before/after/broke/verdict on summary."""
     failed = summary.get("failed_cases", [])
     log(f"4. Re-test: {len(cases)} cases x {repeat} fresh calls, before and after")
-    rb = retest.run_suite(cases, old, repeat=repeat, log=log, fresh=True)
-    ra = retest.run_suite(cases, new, repeat=repeat, log=log, fresh=True)
+    rb = retest.run_suite_complete(cases, old, repeat=repeat, log=log, fresh=True)
+    ra = retest.run_suite_complete(cases, new, repeat=repeat, log=log, fresh=True)
     before, after = rb.run, ra.run
     summary["sim_cost_usd"] = round(summary.get("sim_cost_usd", 0) + cost.sim_cost(rb.output) + cost.sim_cost(ra.output), 3)
     summary.update(before=score_dict(before), after=score_dict(after), retest_repeat=repeat)
@@ -487,11 +487,13 @@ def main(argv: list[str] | None = None) -> int:
         base = None if summ.get("retest_cases") else collect.parse(Path(
             summ.get("baseline_path") or config.TEST_CHECKOUT / "demo_line" / "suite_runs" / summ["baseline_file"]))
         cases = summ.get("retest_cases") or (summ["failed_cases"] + pick_guard_cases(base, summ["failed_cases"], a.guards))
-        summ.pop("approved", None)
         try:
             prove(summ, cases, (d / "prompt.before.md").read_text(), (d / "prompt.proposed.md").read_text(), a.repeat)
         except retest.Refused as e:
-            summ["verdict"] = f"Re-test refused by the $2/day simulator cap: {e}"
+            # Nothing new was learned: leave the night exactly as it was (approval and verdict included).
+            log(f"Re-test refused by the $2/day simulator cap, night unchanged: {e}")
+            return 2
+        summ.pop("approved", None)  # new evidence: an earlier approval no longer covers it
         return finish(d, summ)
     if a.cmd == "export":
         site, issues = export.build(a.nights)

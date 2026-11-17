@@ -754,6 +754,50 @@ class StatusTests(unittest.TestCase):
         self.assertEqual([d.name for d, _ in status.waiting(nights)], ["a"])
 
 
+class BulletproofTests(unittest.TestCase):
+    def test_crashed_calls_are_rerun_until_counts_match(self):
+        from nightshift import collect, retest
+        attempts = []
+
+        def fake(cases, prompt, repeat, log, fresh):
+            attempts.append(list(cases))
+            if len(attempts) == 1:  # first pass: 2 of 4 calls crash (wifi)
+                calls = [collect.Call("a", True, "ok"), collect.Call("a", False, "simulator failed: conn"),
+                         collect.Call("b", True, "ok"), collect.Call("b", False, "simulator failed: conn")]
+            else:  # the re-run of just the crashed ones works
+                calls = [collect.Call(c, True, "ok") for c in cases]
+            run = collect.Run(Path("x.md"), sum(c.passed for c in calls), len(calls), calls)
+            return retest.Result(run, "")
+        real = retest.run_suite
+        retest.run_suite = fake
+        try:
+            r = retest.run_suite_complete(["a", "b"], "p", repeat=2, log=lambda m: None)
+        finally:
+            retest.run_suite = real
+        self.assertEqual(attempts, [["a", "b"], ["a", "b"]])
+        self.assertEqual((r.run.passed, r.run.total), (4, 4))
+
+    def test_pending_proofs_only_real_unproven_fixes(self):
+        from nightshift import config, nightly
+        with tempfile.TemporaryDirectory() as d:
+            old = config.RUNS
+            config.RUNS = Path(d)
+            try:
+                for name, s in {
+                    "2026-11-18-010000": {"diff": "+x", "retest_cases": ["a"], "mode": "real"},          # pending
+                    "2026-11-18-020000": {"diff": "+x", "retest_cases": ["a"], "after": {"passed": 1}},  # proven
+                    "2026-11-18-030000": {"diff": "+x", "retest_cases": ["a"], "guard_problems": ["no"]},
+                    "2026-11-18-040000": {"diff": "+x", "failed_cases": ["a"], "trace": {"where": "mock"}},
+                    "2026-11-18-050000": {"diff": "+x", "mode": "agent", "failed_cases": []},
+                    "2026-11-18-060000": {"diff": "+x", "failed_cases": ["a"], "rejected": {"why": "no"}},
+                }.items():
+                    (Path(d) / name).mkdir()
+                    (Path(d) / name / "summary.json").write_text(json.dumps(s))
+                self.assertEqual([p.name for p in nightly.pending_proofs()], ["2026-11-18-010000"])
+            finally:
+                config.RUNS = old
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

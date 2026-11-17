@@ -91,6 +91,26 @@ def run_suite(cases: list[str], prompt_text: str | None = None, repeat: int = 1,
         return _run_suite(cases, prompt_text, repeat, log, fresh)
 
 
+def run_suite_complete(cases: list[str], prompt_text: str | None = None, repeat: int = 1, log=print,
+                       fresh: bool = False, retries: int = 2) -> Result:
+    """run_suite, then re-run only the calls that crashed in the simulator (a wifi drop, an API hiccup), up to
+    `retries` times, so before and after end up with the same number of real calls to compare."""
+    first = run_suite(cases, prompt_text, repeat, log, fresh)
+    calls = [c for c in first.run.calls if not c.crashed]
+    outputs = [first.output]
+    todo = [c.case for c in first.run.crashed]
+    for n in range(retries):
+        if not todo:
+            break
+        log(f"  {len(todo)} call(s) crashed in the simulator, not the agent; re-running just those ({n + 1}/{retries})")
+        again = run_suite(todo, prompt_text, 1, log, fresh)
+        outputs.append(again.output)
+        calls += [c for c in again.run.calls if not c.crashed]
+        todo = [c.case for c in again.run.crashed]
+    run = collect.Run(first.run.path, sum(c.passed for c in calls), len(calls), calls)
+    return Result(run=run, output="\n".join(outputs))
+
+
 def _run_suite(cases: list[str], prompt_text: str | None, repeat: int, log, fresh: bool) -> Result:
     problems = checkout_ok()
     if problems:
