@@ -10,7 +10,7 @@ import json
 import re
 from pathlib import Path
 
-from . import stats
+from . import config, stats
 
 
 HIGH_STAKES = ("alert_fails", "gas", "burst_pipe", "burst_pipe_night", "no_water", "in_an_hour_flooding")
@@ -58,7 +58,7 @@ def _diff(diff: str) -> str:
     return "\n".join(out[:24])
 
 
-def render(night_dir: Path, start: int = 0, caption: str = "") -> str:
+def render(night_dir: Path, start: int = 0, caption: str = "", rehearse: bool = False) -> str:
     s = json.loads((night_dir / "summary.json").read_text())
     fails = (night_dir / "failures.md").read_text() if (night_dir / "failures.md").exists() else ""
     case, why, lines = first_failure(fails)
@@ -136,7 +136,48 @@ function go(n){{i=Math.max(0,Math.min(s.length-1,n));s.forEach((x,j)=>x.classLis
 go({start});
 addEventListener('keydown',e=>{{if(['ArrowRight',' ','PageDown'].includes(e.key)){{e.preventDefault();go(i+1)}}if(['ArrowLeft','PageUp'].includes(e.key))go(i-1)}});
 addEventListener('click',e=>{{if(e.target.tagName!=='BUTTON')go(i+1)}});
-</script></body></html>"""
+</script>{rehearsal_html() if rehearse else ""}</body></html>"""
+
+
+PITCH = config.WORKSPACE / "company" / "pitch" / "3min-judges-nightshift-bighack.md"
+SLIDE = re.compile(r"^\*\*\[Slide (\d)[^\n]*\]\*\*\s*$", re.M)
+
+
+def pitch_notes(path: Path = PITCH) -> list[str]:
+    """Lucas's spoken lines for each of the 6 slides, from the pitch script (empty strings if it's missing)."""
+    notes = [""] * 6
+    if not path.exists():
+        return notes
+    body = path.read_text().split("## The 3-minute pitch", 1)[-1].split("\n## ", 1)[0]
+    parts = SLIDE.split(body)  # [before, n, text, n, text, ...]
+    for n, text in zip(parts[1::2], parts[2::2]):
+        if 1 <= int(n) <= 6:
+            notes[int(n) - 1] = text.strip()
+    return notes
+
+
+def rehearsal_html() -> str:
+    """Press N: your lines for this slide plus a 3-minute timer (amber at 2:30, red at 3:00). R resets the timer.
+    Only on Lucas's Mac (serve /rehearse or `stage --rehearse`); never in the public export."""
+    notes = json.dumps([html.escape(n) for n in pitch_notes()])
+    return rf"""<style>
+#notes{{position:fixed;left:0;right:0;bottom:0;max-height:38vh;overflow:auto;background:#0b100dee;border-top:1px solid #2a362f;
+padding:14px 8vw 18px;font:20px/1.45 -apple-system,system-ui,sans-serif;color:#eef2ee;display:none;white-space:pre-wrap}}
+#clock{{position:fixed;top:14px;right:18px;font:600 28px ui-monospace,monospace;color:#9aa79f;display:none}}
+</style><div id="clock">0:00</div><div id="notes"></div><script>
+const NOTES={notes};let t0=null,shown=false;
+function words(x){{return (x.replace(/\*\([^)]*\)\*/g,'').match(/\S+/g)||[]).length}}
+function paint(){{const n=document.getElementById('notes');n.innerHTML=(NOTES[i]||'(no lines for this slide)')
+  .replace(/\*\(([^)]*)\)\*/g,'<i style="color:#7bc67e">($1)</i>')+'<div style="color:#6f7d74;font-size:14px;margin-top:8px">'
+  +words(NOTES[i]||'')+' words · about '+Math.round(words(NOTES[i]||'')/2.5)+' s · N hides · R resets the clock</div>'}}
+const _go=go;go=function(n){{_go(n);if(t0===null&&shown)t0=Date.now();paint()}};
+addEventListener('keydown',e=>{{if(e.key==='n'||e.key==='N'){{shown=!shown;
+  document.getElementById('notes').style.display=shown?'block':'none';document.getElementById('clock').style.display=shown?'block':'none';
+  if(shown&&t0===null)t0=Date.now();paint()}}if(e.key==='r'||e.key==='R'){{t0=Date.now()}}}});
+setInterval(()=>{{if(t0===null)return;const s=Math.floor((Date.now()-t0)/1000),c=document.getElementById('clock');
+  c.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');c.style.color=s>=180?'#e8806f':s>=150?'#e8c46f':'#9aa79f'}},250);
+paint();
+</script>"""
 
 
 def write(night_dir: Path) -> Path:

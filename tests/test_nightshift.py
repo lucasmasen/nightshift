@@ -474,6 +474,23 @@ class RecheckTests(unittest.TestCase):
             self.assertEqual(res["really_worse"], ["kid"])
 
 
+class RehearseTests(unittest.TestCase):
+    def test_notes_parse_and_stay_private(self):
+        from nightshift import stage
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "pitch.md"
+            f.write_text("# x\n## The 3-minute pitch (y)\n\n**[Slide 1: hi]**\nI'm Lucas.\n\n**[Slide 5: proof]**\n"
+                         "79 to 86. *(pause)*\n\n## Submission video\n**[Slide 6: no]**\nnot this\n")
+            notes = stage.pitch_notes(f)
+            self.assertEqual(notes[0], "I'm Lucas.")
+            self.assertEqual(notes[4], "79 to 86. *(pause)*")
+            self.assertEqual(notes[5], "")
+        night = Path(__file__).resolve().parent.parent / "runs" / "2026-11-16-184822"
+        if (night / "summary.json").exists():
+            self.assertNotIn("NOTES=", stage.render(night))
+            self.assertIn("NOTES=", stage.render(night, rehearse=True))
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

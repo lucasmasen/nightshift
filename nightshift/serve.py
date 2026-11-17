@@ -133,7 +133,8 @@ def action_bar(name: str, s: dict) -> str:
     return (f"<div style='position:sticky;top:0;z-index:9;background:#0b100d;border-bottom:1px solid #2a362f;"
             f"padding:12px 16px;font:15px -apple-system,system-ui,sans-serif;color:#eef2ee'>"
             f"<a href='/' style='color:#ede6c8'>&larr; all nights</a> · <a href='/night/{name}/stage' "
-            f"style='color:#ede6c8'>stage view</a> · {state}</div>")
+            f"style='color:#ede6c8'>stage view</a> · <a href='/night/{name}/rehearse' style='color:#ede6c8'>rehearse "
+            f"(press N)</a> · {state}</div>")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -169,8 +170,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(try_page(sample() if "sample=1" in self.path else None))
         if parts[0] == "night" and len(parts) >= 2 and (d := _night(parts[1])):
             s = dashboard.load(d)
-            if len(parts) == 3 and parts[2] == "stage":
-                page = stage.render(d)
+            if len(parts) == 3 and parts[2] in ("stage", "rehearse"):
+                page = stage.render(d, rehearse=parts[2] == "rehearse")
                 if not s.get("approved") and not s.get("rejected") and str(s.get("verdict", "")).startswith("Ready"):
                     page = page.replace("</body>", f"""<script>
 document.getElementById('approve')?.addEventListener('click', e => {{

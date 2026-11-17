@@ -69,9 +69,19 @@ def landing(nights: list[str]) -> str:
     if best:
         n, s = best
         b, a = s["before"], s["after"]
-        nums = (f"<div class='nums'><div><b>{b['passed']}/{b['total']}</b><span>before</span></div>"
-                f"<div><b>{a['passed']}/{a['total']}</b><span>after, fresh calls</span></div>"
-                f"<div><b>{s.get('p_value', 0):.0%}</b><span>chance it's luck</span></div></div>"
+        v = s.get("verify") or {}
+        if v.get("complete") and v.get("with_fix"):  # the full check on every case is the bigger sample: lead with it
+            from . import stats
+            (vb, vt), (va, vat) = map(int, v["baseline"].split("/")), map(int, v["with_fix"].split("/"))
+            luck = stats.fisher_improved(vb, vt, va, vat)
+            nums = (f"<div class='nums'><div><b>{vb / vt:.0%}</b><span>of {vt} test calls passed before</span></div>"
+                    f"<div><b>{va / vat:.0%}</b><span>after the fix ({va}/{vat})</span></div>"
+                    f"<div><b>{luck:.0%}</b><span>chance it's luck</span></div></div>")
+        else:
+            nums = (f"<div class='nums'><div><b>{b['passed']}/{b['total']}</b><span>before</span></div>"
+                    f"<div><b>{a['passed']}/{a['total']}</b><span>after, fresh calls</span></div>"
+                    f"<div><b>{s.get('p_value', 0):.0%}</b><span>chance it's luck</span></div></div>")
+        nums += (""
                 f"<p class='links'><a href='{html.escape(n)}/stage.html'>Watch the night (6 slides)</a> · "
                 f"<a href='{html.escape(n)}/report.html'>Full report</a>"
                 + (f" · <a href='{html.escape(n)}/demo.mp4'>Video</a>" if (SITE / n / "demo.mp4").exists() else "")
@@ -95,6 +105,10 @@ main{{max-width:860px;margin:0 auto;padding:64px 16px}} h1{{font-size:clamp(40px
 <li><b>Proof.</b> The same calls re-run fresh, before and after, with the odds the gain is luck. One case getting much worse blocks approval.</li>
 <li><b>A person approves.</b> Nothing goes live on its own.</li>
 </ol>
+<p><b>Any voice agent, not just ours.</b> Give Nightshift an agent's instructions and a folder of call transcripts.
+With no grader for someone else's agent, the HarnessRouter agent does the triage too: it reads every call, decides
+which went wrong and why, then makes the fix. On a made-up dental office's AI it caught both planted mistakes (a
+"the dentist will call you back tonight" nobody could keep, and a medicine dose) for about 9 cents.</p>
 <div class="foot">Built by Lucas for The Big Hack Game (Berkeley), Nov 2026. Agent: Godfrey, an after-hours AI receptionist for plumbers; demo shop Sunset Plumbing is made up. Scores are simulated calls.</div>
 </main></body></html>"""
 
