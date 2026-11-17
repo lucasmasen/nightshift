@@ -93,6 +93,8 @@ def publishable_nights(include_real: bool = False) -> list[str]:
             continue
         if s.get("mode") == "real" and not include_real:
             continue
+        if s.get("mode") == "agent":  # other agents' transcripts: publish by hand after a read, never by default
+            continue
         out.append(d.name)
     return out
 
