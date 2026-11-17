@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Runs one Nightshift night at 2:00am every day while this Mac is awake or wakes.
+     NOT installed. To install (a person decides; it spends up to about $1.25 a night of the $2/day simulator cap
+     plus up to $1.50 of model usage on HarnessRouter):
+       cp launchd/ai.nightshift.night.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/ai.nightshift.night.plist
+     To remove:
+       launchctl unload ~/Library/LaunchAgents/ai.nightshift.night.plist && rm ~/Library/LaunchAgents/ai.nightshift.night.plist -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>ai.nightshift.night</string>
+  <key>WorkingDirectory</key><string>/Users/lucasmasen/AI Infrastructure Claude/nightshift</string>
+  <key>ProgramArguments</key><array>
+    <string>/opt/homebrew/bin/python3</string><string>-m</string><string>nightshift</string><string>night</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>/Users/lucasmasen/AI Infrastructure Claude/nightshift/runs/launchd.log</string>
+  <key>StandardErrorPath</key><string>/Users/lucasmasen/AI Infrastructure Claude/nightshift/runs/launchd.log</string>
+</dict></plist>

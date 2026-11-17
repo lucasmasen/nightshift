@@ -126,9 +126,17 @@ class Client:
         content = [{"type": "input_text", "text": text}] + [{"type": "input_file", "file_id": f} for f in file_ids]
         body = {"input": [{"role": "user", "content": content}], "user": config.USER_ID,
                 "metadata": {"harness_id": harness_id}, "background": True}
-        # Same key + same body may be retried safely; a fresh key per task.
-        return self.request("POST", "/v1/responses", body, headers={"Idempotency-Key": str(uuid.uuid4())},
-                            retry=True)
+        # Same key + same body may be retried safely; a fresh key per task. The free plan runs 2 tasks at a time,
+        # so a 429 one_at_a_time waits (up to ~5 min) for an earlier task to finish instead of failing the night.
+        key = str(uuid.uuid4())
+        for attempt in range(20):
+            try:
+                return self.request("POST", "/v1/responses", body, headers={"Idempotency-Key": key}, retry=True)
+            except HRError as e:
+                if e.code != "one_at_a_time" or attempt == 19:
+                    raise
+                self.sleep(15)
+        raise AssertionError("unreachable")
 
     def wait(self, response_id: str, every: float = 10.0, limit: float = config.TASK_TIMEOUT_SECONDS + 120,
              on_tick: Callable[[dict, float], None] | None = None) -> dict:

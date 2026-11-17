@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import collect, config, dashboard, fixer, guard, report, retest
+from . import collect, config, dashboard, fixer, guard, report, retest, stage
 from .hr import Client, HRError
 
 
@@ -158,6 +158,8 @@ def finish(out: Path, summary: dict) -> int:
     (out / "report.html").write_text(report.render(summary))
     log(f"Verdict: {summary.get('verdict')}")
     log(f"Report: {out / 'report.html'}")
+    if summary.get("diff"):
+        log(f"Stage view: {stage.write(out)}")
     log(f"All nights: {dashboard.write()}")
     return 0
 
@@ -185,6 +187,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--by", default="lucas")
     ap.add_argument("--force", action="store_true")
     sub.add_parser("dashboard", help="Rebuild runs/index.html")
+    st = sub.add_parser("stage", help="Build the 6-slide demo view for one night")
+    st.add_argument("dir")
     r = sub.add_parser("report")
     r.add_argument("dir")
     a = p.parse_args(argv)
@@ -209,6 +213,9 @@ def main(argv: list[str] | None = None) -> int:
         log(msg)
         dashboard.write()
         return 0 if ok else 1
+    if a.cmd == "stage":
+        log(str(stage.write(Path(a.dir))))
+        return 0
     if a.cmd == "dashboard":
         log(str(dashboard.write()))
         return 0
