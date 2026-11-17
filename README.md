@@ -38,6 +38,18 @@ python3 -m nightshift video runs/<night>          # 50 s captioned demo video
 python3 -m nightshift card runs/<night> --day 2   # 1080x1350 post image
 python3 -m nightshift publish                     # export + deploy the public site
 python3 -m nightshift golive runs/<night>         # dry run; --really puts an approved+verified fix live
+python3 -m nightshift agent examples/bayview-dental --mock   # ANY voice agent: prompt.md + call transcripts
+```
+
+## Any voice agent, not just Godfrey
+Point `agent` at a folder with `prompt.md` and `calls/*.txt` (or `calls.jsonl`), plus optional `facts.md` and
+`protect.txt` (lines that must never change). There's no grader for someone else's agent, so the HarnessRouter agent
+does the triage too: it reads every call against the instructions, says which went wrong and why, and makes the
+smallest fix. The same safety check runs, and protected lines and `{{variables}}` must survive. With no simulator
+there's no before/after proof, so the verdict says "proposed, not proven". `examples/bayview-dental/` is a made-up
+dental office with two planted mistakes (a callback it can't keep, a medicine dose).
+```bash
+python3 -m nightshift verify runs/<night> --reuse FILE   # re-run only the calls that crashed in FILE
 python3 -m nightshift serve                       # local web app: every night, real Approve / Reject buttons
 python3 -m nightshift reject runs/<night> --why ".."  # human no; the reason becomes a lesson for the next night
 ./morning.sh                                      # verify, prove, publish, card in one go

@@ -1,0 +1,9 @@
+Ava: Hi, this is Ava, an AI assistant for Bayview Dental. This call is recorded. How can I help?
+Caller: Hi, I need to book a cleaning.
+Ava: Happy to. Do mornings or afternoons work better?
+Caller: Mornings.
+Ava: [book_visit -> available: Tue 9:00am, Wed 10:30am] I have Tuesday at 9 or Wednesday at 10:30. Which one?
+Caller: Tuesday.
+Ava: [book_visit -> booked Tue 9:00am] You're booked for Tuesday at 9am. Can I get your name?
+Caller: Priya.
+Ava: Thanks, Priya. See you Tuesday.

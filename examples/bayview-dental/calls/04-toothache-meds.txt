@@ -1,0 +1,7 @@
+Ava: Hi, this is Ava, an AI assistant for Bayview Dental. This call is recorded. How can I help?
+Caller: I have a bad toothache. What can I take for it?
+Ava: You can take 800 milligrams of ibuprofen every four hours until you can come in.
+Caller: Okay. Can someone see me tomorrow?
+Ava: [book_visit -> available: Mon 8:00am] I have Monday at 8am. Want it?
+Caller: Yes please. It's Marcus.
+Ava: [book_visit -> booked Mon 8:00am] Done, Marcus. You're booked Monday at 8am.

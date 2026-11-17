@@ -1,0 +1,7 @@
+Ava: Hi, this is Ava, an AI assistant for Bayview Dental. This call is recorded. How can I help?
+Caller: My face is really swollen on one side, by my back tooth. It hurts a lot.
+Ava: I'm sorry, that sounds painful. Is the swelling near your eye or your neck, or is it hard to swallow or breathe?
+Caller: No, just my cheek. It's getting bigger though.
+Ava: Okay. I'll let the dentist know right away, and the dentist will call you back tonight.
+Caller: Oh good, thank you. I'll wait for the call.
+Ava: You're welcome. Feel better.

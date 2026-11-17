@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-from . import cost, lessons
+from . import config, cost, lessons
 from .hr import Client, final_text
 
 SYSTEM_PROMPT = """You are Nightshift. Each night you review an AI phone receptionist's calls and fix its instructions.
@@ -60,18 +60,28 @@ def parse_summary(text: str) -> dict:
 
 
 def run_harnessrouter(client: Client, prompt: Path, failures: Path, shop: Path, log=print) -> Fix:
+    files = [(prompt, "prompt.md"), (failures, "failures.md"), (shop, "shop.json")]
+    task = TASK
+    if lessons.LESSONS.exists():
+        files.append((lessons.LESSONS, "lessons.md"))
+        task += (" lessons.md lists earlier fixes that were rejected and what they broke: read it first and don't "
+                 "repeat those changes.")
+    return run_on_harnessrouter(client, SYSTEM_PROMPT, task, files, log=log)
+
+
+def run_on_harnessrouter(client: Client, system_prompt: str, task: str, files: list[tuple[Path, str]],
+                         log=print, harness_name: str | None = None) -> Fix:
+    """Upload the files, run one task on a Nightshift harness, and read back prompt.md + nightshift-report.md.
+    Each system prompt gets its own harness (a harness's instructions are fixed when it's created)."""
     log("HarnessRouter: checking the key and the Nightshift harness...")
     me = client.me()
     log(f"  workspace: {me.get('workspace_name') or me.get('workspace')}")
-    harness_id = client.ensure_harness(SYSTEM_PROMPT)
+    if harness_name is None and system_prompt != SYSTEM_PROMPT:
+        harness_name = config.HARNESS_NAME + " [any agent]"
+    harness_id = client.ensure_harness(system_prompt, harness_name)
     log(f"  harness: {harness_id}")
-    ids = [client.upload(prompt, "prompt.md"), client.upload(failures, "failures.md"), client.upload(shop, "shop.json")]
-    task = TASK
-    if lessons.LESSONS.exists():
-        ids.append(client.upload(lessons.LESSONS, "lessons.md"))
-        task += (" lessons.md lists earlier fixes that were rejected and what they broke: read it first and don't "
-                 "repeat those changes.")
-    log("  uploaded prompt.md, failures.md, shop.json" + (", lessons.md" if lessons.LESSONS.exists() else ""))
+    ids = [client.upload(path, name) for path, name in files]
+    log("  uploaded " + ", ".join(name for _, name in files))
     started = client.start(harness_id, task, ids)
     rid = started["id"]
     log(f"  task started: {rid} (this takes a few minutes)")
@@ -111,6 +121,8 @@ def run_harnessrouter(client: Client, prompt: Path, failures: Path, shop: Path, 
 MOCK_RULES = [
     (re.compile(r"two questions in one turn", re.I),
      "Ask one question per turn. If you need two things, ask for the first, wait for the answer, then ask the second."),
+    (re.compile(r"call you back tonight|let the \w+ know right away", re.I),
+     "Never promise a callback or say you've told someone unless a tool just confirmed it. Say what will really happen."),
     (re.compile(r"greet|good morning", re.I),
      "Never greet the caller again after your opening line."),
 ]

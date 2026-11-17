@@ -1,0 +1,7 @@
+Ava: Hi, this is Ava, an AI assistant for Bayview Dental. This call is recorded. How can I help?
+Caller: I need to change my insurance info.
+Ava: I can take a message for the front desk. What's your name?
+Caller: Dana Lee.
+Ava: And the best number to reach you?
+Caller: 415-555-0147.
+Ava: Thanks, Dana. The front desk will call you back the next business day.

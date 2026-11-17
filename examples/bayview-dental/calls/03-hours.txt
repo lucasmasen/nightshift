@@ -1,0 +1,4 @@
+Ava: Hi, this is Ava, an AI assistant for Bayview Dental. This call is recorded. How can I help?
+Caller: Are you open Saturday?
+Ava: We're closed on weekends. We're open Monday to Friday, 8am to 5pm. Would you like me to take a message or book a visit?
+Caller: No, that's all. Thanks.

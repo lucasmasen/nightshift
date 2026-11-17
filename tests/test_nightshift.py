@@ -400,6 +400,55 @@ class OpsTests(unittest.TestCase):
         self.assertEqual(ops._clip("short", 9), "short")
 
 
+class AnyAgentTests(unittest.TestCase):
+    SAMPLE = Path(__file__).resolve().parent.parent / "examples" / "bayview-dental"
+
+    def test_load_sample(self):
+        from nightshift import anyagent
+        a = anyagent.load(self.SAMPLE)
+        self.assertEqual(len(a.calls), 5)
+        self.assertTrue(a.facts)
+        self.assertIn("## Call 02-swollen-face", anyagent.calls_markdown(a))
+
+    def test_safety_protects_lines_and_variables(self):
+        from nightshift import anyagent
+        a = anyagent.load(self.SAMPLE)
+        bad = a.prompt.replace("This call is recorded.", "").replace("{{office_name}}", "the office")
+        problems = " ".join(anyagent.safety_problems(a, bad))
+        self.assertIn("protected line", problems)
+        self.assertIn("{{office_name}}", problems)
+        ok = a.prompt.replace("6. Be warm and brief.", "6. Be warm and brief. Never give medicine doses.")
+        self.assertEqual(anyagent.safety_problems(a, ok), [])
+
+    def test_missing_files_refused(self):
+        from nightshift import anyagent
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(ValueError):
+                anyagent.load(Path(d))
+            (Path(d) / "prompt.md").write_text("x")
+            with self.assertRaises(ValueError):
+                anyagent.load(Path(d))
+
+    def test_mock_night_end_to_end(self):
+        import argparse
+        from nightshift import __main__ as cli, config, lessons
+        with tempfile.TemporaryDirectory() as d:
+            old_runs, old_lessons = config.RUNS, lessons.LESSONS
+            config.RUNS, lessons.LESSONS = Path(d) / "runs", Path(d) / "lessons.md"
+            try:
+                rc = cli.agent_night(argparse.Namespace(dir=str(self.SAMPLE), mock=True))
+                self.assertEqual(rc, 0)
+                night = next(config.RUNS.glob("2*"))
+                s = json.loads((night / "summary.json").read_text())
+                self.assertEqual(s["mode"], "agent")
+                self.assertEqual(s["guard_problems"], [])
+                self.assertTrue(s["verdict"].startswith("Proposed, not proven: 1 of 5"), s["verdict"])
+                self.assertIn("Never promise a callback", (night / "prompt.proposed.md").read_text())
+                self.assertTrue((night / "report.html").exists())
+            finally:
+                config.RUNS, lessons.LESSONS = old_runs, old_lessons
+
+
 class LessonTests(unittest.TestCase):
     def test_learn_only_from_rejections_and_no_duplicates(self):
         from nightshift import lessons

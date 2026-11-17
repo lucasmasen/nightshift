@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import collect, config, cost, dashboard, export, fixer, guard, lessons, ops, realcalls, report, retest, stage, stats, video
+from . import anyagent, collect, config, cost, dashboard, export, fixer, guard, lessons, ops, realcalls, report, retest, stage, stats, video
 from .hr import Client, HRError
 
 
@@ -216,6 +216,49 @@ def real_night(args: argparse.Namespace, out: Path, stamp: str) -> int:
     return finish(out, summary)
 
 
+def agent_night(args: argparse.Namespace) -> int:
+    """Any voice agent: a folder with prompt.md + call transcripts. The HarnessRouter agent triages and fixes."""
+    try:
+        a = anyagent.load(Path(args.dir))
+    except ValueError as e:
+        log(f"Not starting: {e}")
+        return 1
+    stamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    out = config.RUNS / stamp
+    out.mkdir(parents=True)
+    log(f"Nightshift night {stamp} for {a.name}: {len(a.calls)} calls -> {out}")
+    client = None
+    if not args.mock:
+        key = config.api_key()
+        if not key:
+            log("No HR_API_KEY in nightshift/.env. Add it, or run with --mock.")
+            return 1
+        client = Client(key)
+    log("1-2. Triage + fix: the agent reads every call, finds the ones that went wrong, fixes prompt.md")
+    fix = anyagent.run(a, out, client, log=log)
+    (out / "prompt.proposed.md").write_text(fix.prompt)
+    (out / "nightshift-report.md").write_text(fix.report)
+    diff = guard.diff_text(a.prompt, fix.prompt)
+    (out / "change.diff").write_text(diff)
+    reviewed = int(fix.summary.get("calls_reviewed") or len(a.calls))
+    wrong = int(fix.summary.get("calls_wrong") or 0)
+    summary: dict = {"date": stamp, "agent": a.name, "mode": "agent", "baseline_passed": max(0, reviewed - wrong),
+                     "baseline_total": reviewed, "baseline_file": f"{a.name} transcripts", "failed_cases": [],
+                     "agent_report": fix.report, "diff": diff, "trace": fix.trace, "agent_summary": fix.summary}
+    problems = anyagent.safety_problems(a, fix.prompt) if fix.prompt != a.prompt else []
+    summary["guard_problems"] = problems
+    log("3. Safety check: " + ("passed" if not problems else "REJECTED: " + " | ".join(problems)))
+    if not diff:
+        summary["verdict"] = f"No change: the agent found nothing the instructions could fix ({wrong} of {reviewed} calls went wrong)."
+    elif problems:
+        summary["verdict"] = "Nightshift's fix was rejected by the safety check."
+    else:
+        summary["verdict"] = (f"Proposed, not proven: {wrong} of {reviewed} calls went wrong and the fix passed the safety "
+                              "check, but there's no simulator for this agent, so it can't be re-tested before and after. "
+                              "Review the diff, then compare tomorrow night's calls.")
+    return finish(out, summary)
+
+
 def verdict(summary: dict) -> str:
     """Ready only when the gain is unlikely to be luck (one-sided Fisher p < 0.2) and no passing case got worse."""
     b, a = summary["before"], summary["after"]
@@ -307,6 +350,10 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--guards", type=int, default=3)
     ex = sub.add_parser("export", help="Build site/ (public static copy) from the named nights; never deploys")
     ex.add_argument("nights", nargs="+")
+    ag = sub.add_parser("agent", help="Any voice agent: a folder with prompt.md + calls/ transcripts (see anyagent.py)")
+    ag.add_argument("dir")
+    ag.add_argument("--mock", action="store_true", help="No HarnessRouter call, no spend")
+    ag.add_argument("--base", help="Harness base: claude-code (default) or codex")
     vf = sub.add_parser("verify", help="Run every case once with a night's fix and compare with its baseline (~$0.90)")
     vf.add_argument("dir")
     vf.add_argument("--reuse", help="a suite run file that already ran; only its crashed calls are re-run")
@@ -347,6 +394,8 @@ def main(argv: list[str] | None = None) -> int:
             time.sleep(60)
         log("gave up waiting for a working model key")
         return 1
+    if a.cmd == "agent":
+        return agent_night(a)
     if a.cmd == "approve":
         ok, msg = dashboard.approve(Path(a.dir), a.by, a.force)
         log(msg)
