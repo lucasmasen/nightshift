@@ -81,6 +81,31 @@ the 1-of-4 to 4-of-4 case, which looks noisier than it did: today the unfixed pr
 >
 > so reply to this and tell me i'm wrong
 
+## Day 2 drafts (Tue 11/17; numbers from BUILD-LOG day 2)
+**11. the wifi (no tags) (251)**
+> my test this morning said my ai got way worse overnight. 140 passing calls down to 81.
+>
+> it was the wifi. 83 calls crashed before the ai said a word, and my code counted them as fails.
+>
+> real number: 140 to 153. always check the boring explanation first
+
+**12. the dentist (contest) (283)**
+> pointed nightshift at a made up dental office's ai.
+>
+> it found the ai telling a patient "the dentist will call you back tonight" when nobody can be paged at night, and giving an ibuprofen dose.
+>
+> fixed both in 2 lines. 9 cents.
+>
+> https://nightshift-bighack.vercel.app
+> #HarnessRouter #UHP #BigHackGame
+
+**13. my own story was luck (no tags) (230)**
+> the best story in my pitch was partly luck.
+>
+> "the burst pipe call went from 1 of 4 to 4 of 4." today, with no fix at all, it scored 3 of 4.
+>
+> so i lead with the boring number now. 178 calls, 79% to 86%. less exciting, actually true
+
 ## Posting order (my pick)
 Tue: 1 (contest, morning), 6 (afternoon), 10 (evening). Wed: 3, 8. Thu: 2, 4. Fri after Demo Day: the result.
 Reply to every reply within the first hour.
