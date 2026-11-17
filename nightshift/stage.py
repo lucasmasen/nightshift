@@ -39,6 +39,49 @@ def first_failure(failures_md: str) -> tuple[str, str, list[str]]:
     return pick[0], pick[1].strip(), marked[:9]
 
 
+QUOTE = re.compile(r'"([A-Za-z][^"\n]{6,118})"|“([A-Za-z][^”\n]{6,118})”')
+
+
+def _quotes(text: str) -> list[str]:
+    return [(x or y).strip()[:30] for x, y in QUOTE.findall(text)]
+
+
+def first_real_failure(failures_md: str, agent_report: str) -> tuple[str, str, list[str]]:
+    """Real-call nights: (call id, the cause shown, up to 9 lines) from the redacted full calls. Picks the agent's
+    cause whose quoted bad moments match the most of the call, and highlights those lines plus the caller's line
+    right before each."""
+    full = failures_md.split("# Full calls (redacted)", 1)[-1] if "# Full calls (redacted)" in failures_md else ""
+    calls = re.findall(r"^## Call (\w+)[^\n]*\n(.*?)(?=^## Call |\Z)", full, re.M | re.S)
+    if not calls:
+        return "", "", []
+    cid, body = calls[0]
+    lines = []
+    for ln in body.strip().splitlines():
+        if ln.startswith(("Godfrey:", "Caller:")):
+            who, text = ln.split(":", 1)
+            lines.append(f"**{who}:**{text}")
+        elif ln.startswith("[") and ":" in ln:
+            lines.append(f"`[{ln[1:].split(':', 1)[0].strip()}]`")
+    causes = []
+    for block in re.split(r"(?=^## Cause )", agent_report, flags=re.M):
+        title = re.match(r"## Cause \d+:?\s*(.+)", block)
+        if title:
+            qs = _quotes(block.split("\n## ", 1)[0])
+            hits = [i for i, ln in enumerate(lines) if ln.startswith("**Godfrey") and any(q in ln for q in qs)]
+            causes.append((len(hits), title.group(1).strip(), set(hits)))
+    if not causes:
+        return f"real call {cid}", "", lines[:9]
+    _, cause, hot = max(causes, key=lambda c: c[0])
+    keep = set()
+    for i in sorted(hot):
+        keep.add(i)
+        if i and lines[i - 1].startswith("**Caller"):
+            keep.add(i - 1)
+    marked = [("!" if i in hot else "") + ln for i, ln in enumerate(lines)]
+    picked = [m for i, m in enumerate(marked) if i in keep] if hot else marked
+    return f"real call {cid}", cause, picked[:9]
+
+
 def _line(raw: str) -> str:
     hot = raw.startswith("!")
     raw = html.escape(raw[1:] if hot else raw)
@@ -61,7 +104,8 @@ def _diff(diff: str) -> str:
 def render(night_dir: Path, start: int = 0, caption: str = "", rehearse: bool = False) -> str:
     s = json.loads((night_dir / "summary.json").read_text())
     fails = (night_dir / "failures.md").read_text() if (night_dir / "failures.md").exists() else ""
-    case, why, lines = first_failure(fails)
+    case, why, lines = (first_real_failure(fails, s.get("agent_report", "")) if s.get("mode") == "real"
+                        else first_failure(fails))
     total, passed = s.get("baseline_total", 0), s.get("baseline_passed", 0)
     t = s.get("trace") or {}
     b, a = s.get("before") or {}, s.get("after") or {}
@@ -116,10 +160,10 @@ h1{{font-size:clamp(40px,6vw,84px);line-height:1.05;margin:16px 0}} h2{{font-siz
 button.done{{background:var(--c)}} .cap{{position:fixed;left:0;right:0;bottom:0;padding:22px 8vw 28px;background:rgba(10,16,12,.92);color:var(--c);font-size:30px;font-weight:600;line-height:1.3;border-top:1px solid var(--line)}} .hint{{position:fixed;bottom:14px;right:18px;color:var(--mute);font-size:14px}}
 @media(max-width:700px){{.row{{grid-template-columns:1fr;}} .n{{text-align:left}}}}
 </style></head><body>
-<section><div class="k">{"Real calls" if s.get("mode") == "real" else "Last night"}</div><h1>Godfrey took {total} {"real " if s.get("mode") == "real" else ""}calls.</h1><div class="big">{total - passed}</div>
+<section><div class="k">{"Real calls" if s.get("mode") == "real" else "Last night"}</div><h1>{("A real person called Godfrey." if total == 1 else f"{total} real people called Godfrey.") if s.get("mode") == "real" else f"Godfrey took {total} calls."}</h1><div class="big">{total - passed}</div>
 <h2 class="mute">went wrong. Nobody was awake to notice.</h2></section>
 <section><div class="k">One of them · {html.escape(case)}</div><div class="call">{"".join(f"<div>{_line(x)}</div>" for x in lines)}</div>
-<div class="why">Graded fail: {html.escape(why[:240])}{"…" if len(why) > 240 else ""}</div></section>
+<div class="why">{"What Nightshift found" if s.get("mode") == "real" else "Graded fail"}: {html.escape(why[:240])}{"…" if len(why) > 240 else ""}</div></section>
 <section><div class="k">2am</div><h1>Nightshift hands the failures to an agent on HarnessRouter.</h1>
 <h2 class="mute">It traces each one to the instruction that caused it and makes the smallest fix.</h2>
 <div class="mute">{html.escape(where)}{spend} · harness {html.escape(str(t.get("harness_id", "")))}</div></section>

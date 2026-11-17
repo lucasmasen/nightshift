@@ -618,6 +618,22 @@ class TwinTests(unittest.TestCase):
             self.assertIn("b", data)
 
 
+class RealStageTests(unittest.TestCase):
+    def test_real_call_slide_picks_matching_cause(self):
+        from nightshift import stage
+        fails = ("# flags\n# Full calls (redacted)\n\n## Call abcd1234 (x)\n\nGodfrey: Hi, I'm an AI.\n"
+                 "Caller: gas!\n[alert: {}]\nGodfrey: Get out.\nCaller: no number\n"
+                 "Godfrey: What's the best number to reach you?\nCaller: no\nGodfrey: What's the best number again?\n")
+        report = ("## Cause 1: hung up\n- \"Bye now.\"\n## Cause 2: re-asking the number\n"
+                  "- \"What's the best number to reach you?\" and \"What's the best number again?\"\n"
+                  "## Not fixed\n- \"Get out.\" is fine\n")
+        case, why, lines = stage.first_real_failure(fails, report)
+        self.assertEqual(case, "real call abcd1234")
+        self.assertEqual(why, "re-asking the number")
+        self.assertEqual(sum(ln.startswith("!") for ln in lines), 2)
+        self.assertFalse(any("Get out" in ln and ln.startswith("!") for ln in lines))
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

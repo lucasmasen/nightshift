@@ -102,3 +102,12 @@ now saves after each run and finishes Wednesday instead of starting over.
 
 **Next (Wed).** Codex's half of the comparison, the re-check of the 10 flipped cases, then a fix for anything
 that's really worse.
+
+**Afternoon, the first real call (Tue 11/17).** A friend called the demo line and trolled it: gas smell, "reverse a
+linked list", "call me at 1 800 deep nuts". Godfrey got the gas safety right but asked for a callback number about 7
+times and hung up with "bye now" on swearing. The automatic flags missed the number loop, so real-call nights now
+hand the fix agent the whole scrubbed calls; it found all three causes and fixed them in 3 lines. Two privacy bugs
+surfaced and were fixed the same hour: a first name slipped past the scrubber in a short excerpt, and "call 911"
+was being scrubbed as an address. The call became a permanent test (`real_gas_troll`), every flagged real call now
+does automatically, and nightly runs skip calls already reviewed. Loop round 1: the stage slides now tell a
+real-call night properly (the real call, the cause that matches it, "A real person called Godfrey.").
