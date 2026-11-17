@@ -16,7 +16,9 @@ harness reads the failed calls and edits the agent's prompt as a background task
 4. **Prove it.** The failed cases plus a few cases that already passed are re-run with fresh calls only, same number
    before and after. A one-sided Fisher test says how likely the gain is to be luck; "ready" needs p < 0.2 and no
    passing case getting worse.
-5. **Morning report.** `runs/<night>/report.html`: before/after score, the exact change, the agent's reasoning, and
+5. **Lessons.** Every rejected fix (by the proof or a person) goes into lessons.md, which the next night's agent
+   reads first, so it doesn't make the same mistake twice.
+6. **Morning report.** `runs/<night>/report.html`: before/after score, the exact change, the agent's reasoning, and
    what it cost. Nothing goes live until a person approves.
 
 ## Run it
@@ -36,6 +38,8 @@ python3 -m nightshift video runs/<night>          # 50 s captioned demo video
 python3 -m nightshift card runs/<night> --day 2   # 1080x1350 post image
 python3 -m nightshift publish                     # export + deploy the public site
 python3 -m nightshift golive runs/<night>         # dry run; --really puts an approved+verified fix live
+python3 -m nightshift serve                       # local web app: every night, real Approve / Reject buttons
+python3 -m nightshift reject runs/<night> --why ".."  # human no; the reason becomes a lesson for the next night
 ./morning.sh                                      # verify, prove, publish, card in one go
 python3 -m unittest discover -s tests            # tests, no network
 ```
