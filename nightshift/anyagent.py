@@ -65,7 +65,8 @@ class AgentDir:
 
     @property
     def name(self) -> str:
-        return self.path.name
+        label = self.path / "name.txt"
+        return label.read_text().strip()[:60] if label.is_file() and label.read_text().strip() else self.path.name
 
 
 def load(path: Path) -> AgentDir:

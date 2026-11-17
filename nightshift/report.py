@@ -29,6 +29,7 @@ def approved_html(night: dict) -> str:
 
 
 def render(night: dict) -> str:
+    agent_mode = night.get("mode") == "agent"
     """night: the summary dict __main__ writes (see build_summary)."""
     b, a = night.get("before"), night.get("after")
     verdict = night.get("verdict", "")
@@ -50,6 +51,24 @@ def render(night: dict) -> str:
     if b and a:
         big = (f"<div class='score'><div><span>before</span><b>{_pct(b['passed'], b['total'])}</b></div>"
                f"<div class='arrow'>&rarr;</div><div><span>after</span><b>{_pct(a['passed'], a['total'])}</b></div></div>")
+    nfail = len(night.get("failed_cases", []))
+    if agent_mode:
+        wrong = night.get("baseline_total", 0) - night.get("baseline_passed", 0)
+        intro = (f"Nightshift's agent read {night.get('baseline_total', 0)} calls against the instructions and judged "
+                 f"{wrong} went wrong. There's no simulator for this agent, so the fix isn't re-tested: read the "
+                 "change and the agent's reasons below, then compare the next batch of calls.")
+        retest_html = ""
+    else:
+        intro = (f"{night.get('baseline_passed', 0)} of {night.get('baseline_total', 0)} simulated calls passed overnight; "
+                 f"{nfail} kind{'' if nfail == 1 else 's'} of call failed and got a fix. Nightshift proposed a fix and "
+                 "re-ran the failed calls plus calls that already passed (to catch anything the fix breaks).")
+        v = night.get("verify") or {}
+        if v.get("complete") and v.get("with_fix"):
+            intro += (f" Then the fix ran on every test case once: {v['baseline']} before, {v['with_fix']} after "
+                      f"({v['baseline_rate']:.0%} to {v['with_fix_rate']:.0%}).")
+        retest_html = ('<h2>Every case it re-ran</h2><div class="card"><table><tr><th>Case</th><th>Why re-run</th>'
+                       '<th>Before</th><th>After</th></tr>' + ("".join(rows) or "<tr><td colspan=4>No re-run.</td></tr>")
+                       + "</table></div>")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Nightshift report</title>
 <style>
@@ -67,12 +86,9 @@ th{{color:var(--mute);font-weight:500}} tr.up td:last-child{{color:var(--good)}}
 <h1>Nightshift</h1><div class="sub">Night of {html.escape(night.get("date", ""))} &middot; {html.escape(night.get("agent", "voice agent"))}
 &middot; generated {datetime.now():%b %d, %I:%M %p}</div>
 <div class="card"><div class="verdict">{html.escape(verdict)}</div>{big}
-<div class="sub">{night.get("baseline_passed", 0)} of {night.get("baseline_total", 0)} simulated calls passed overnight;
-{len(night.get("failed_cases", []))} kind{"" if len(night.get("failed_cases", [])) == 1 else "s"} of call failed and got a fix. Nightshift proposed a fix and re-ran the failed calls plus
-calls that already passed (to catch anything the fix breaks).</div></div>
+<div class="sub">{intro}</div></div>
 {f'<div class="card warn"><b>Fix rejected by the safety check</b><ul>{problems}</ul></div>' if problems else ''}
-<h2>Every case it re-ran</h2><div class="card"><table><tr><th>Case</th><th>Why re-run</th><th>Before</th><th>After</th></tr>
-{"".join(rows) or "<tr><td colspan=4>No re-run.</td></tr>"}</table></div>
+{retest_html}
 <h2>The change it proposes</h2><div class="card diff">{_diff_html(night.get("diff", "")) or "No change."}</div>
 <h2>Why (Nightshift's own report)</h2><div class="card rep">{html.escape(night.get("agent_report", ""))}</div>
 <h2>Where it ran</h2><div class="card sub">{"<br>".join(trace_bits) or "-"}</div>

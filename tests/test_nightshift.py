@@ -449,6 +449,21 @@ class AnyAgentTests(unittest.TestCase):
                 config.RUNS, lessons.LESSONS = old_runs, old_lessons
 
 
+class TryPageTests(unittest.TestCase):
+    def test_split_and_validate(self):
+        from nightshift import serve
+        self.assertEqual(serve.split_calls("a: hi\n---\nb: yo\n  ---  \n\n"), ["a: hi", "b: yo"])
+        self.assertIsNone(serve.start_try({"prompt": "", "calls": "x"})[0])
+        self.assertIsNone(serve.start_try({"prompt": "p", "calls": "\n---\n".join(["c"] * 51)})[0])
+        self.assertIsNone(serve.start_try({"prompt": "p" * 20_001, "calls": "c"})[0])
+        self.assertIn("Bayview", serve.sample()["name"])
+
+    def test_try_page_escapes(self):
+        from nightshift import serve
+        page = serve.try_page({"prompt": "</textarea><script>x</script>"})
+        self.assertNotIn("<script>x", page)
+
+
 class LessonTests(unittest.TestCase):
     def test_learn_only_from_rejections_and_no_duplicates(self):
         from nightshift import lessons
