@@ -10,6 +10,8 @@ import json
 import re
 from pathlib import Path
 
+from . import stats
+
 
 HIGH_STAKES = ("alert_fails", "gas", "burst_pipe", "burst_pipe_night", "no_water", "in_an_hour_flooding")
 
@@ -72,8 +74,8 @@ def render(night_dir: Path, start: int = 0, caption: str = "") -> str:
                     f"<div class='bar'><i class='b' style='width:{100 * bp / bt if bt else 0:.0f}%'></i></div>"
                     f"<div class='bar'><i class='a' style='width:{100 * ap / at if at else 0:.0f}%'></i></div>"
                     f"<div class='n'>{bp}/{bt} &rarr; {ap}/{at}</div></div>")
-    evidence = (f"{s.get('retest_repeat', '')} fresh calls per case · chance this is luck: "
-                f"{s['p_value']:.0%} ({s.get('evidence', '')})") if "p_value" in s else ""
+    evidence = html.escape(f"{s.get('retest_repeat', '')} fresh calls per case · chance this is luck: "
+                           f"{s['p_value']:.0%} ({s.get('evidence', '')})") if "p_value" in s else ""
     ap = s.get("approved")
     approve_button = (f"<button class='done'>Approved ✓ by {html.escape(str(ap.get('by')))}</button>" if ap else
                       "<button id='approve' onclick=\"this.textContent='Approved ✓';this.classList.add('done')\">Approve</button>")
@@ -83,6 +85,17 @@ def render(night_dir: Path, start: int = 0, caption: str = "") -> str:
     if isinstance(s.get("sim_cost_usd"), (int, float)):
         spend += f" · proof ${s['sim_cost_usd']:.2f} in test calls"
     score = (f"{b.get('passed', 0)}/{b.get('total', 0)} &rarr; {a.get('passed', 0)}/{a.get('total', 0)}" if a else "not re-tested")
+    # When the fix was also run on every case (verify), that bigger sample leads and the close-up comes second.
+    v = s.get("verify") or {}
+    full = ""
+    if v.get("complete") and v.get("baseline") and v.get("with_fix"):
+        (vb, vt), (va, vat) = map(int, v["baseline"].split("/")), map(int, v["with_fix"].split("/"))
+        luck = stats.fisher_improved(vb, vt, va, vat) if vt == vat else None
+        full = (f"<div class='full'>Up close, the cases it fixed, {s.get('retest_repeat', '')} fresh calls each: "
+                f"<b>{score}</b> · {evidence.split(' · ')[-1]}</div>") if a else ""
+        score = f"{vb}/{vt} &rarr; {va}/{vat}"
+        evidence = (f"every test case, {vb / vt:.0%} &rarr; {va / vat:.0%}"
+                    + (f" · chance this is luck: {luck:.0%}" if luck is not None else ""))
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nightshift</title><style>
 :root{{--bg:#0f1512;--ink:#eef2ee;--mute:#8d9b92;--g:#7bc67e;--c:#ede6c8;--r:#e8806f;--card:#17201b;--line:#2a362f}}
@@ -99,7 +112,7 @@ h1{{font-size:clamp(40px,6vw,84px);line-height:1.05;margin:16px 0}} h2{{font-siz
 .row{{display:grid;grid-template-columns:260px 1fr 1fr 130px;gap:14px;align-items:center;margin:10px 0;font-size:18px}}
 .row small{{display:block;color:var(--mute);font-size:13px}} .bar{{height:18px;background:#0b1a10;border-radius:9px;overflow:hidden}}
 .bar i{{display:block;height:100%;border-radius:9px}} .b{{background:#55625a}} .a{{background:var(--g)}} .n{{text-align:right}}
-.legend{{color:var(--mute);font-size:16px}} button{{font:inherit;font-size:26px;padding:16px 34px;border-radius:12px;border:0;background:var(--g);color:#0f1512;font-weight:700;cursor:pointer}}
+.full{{font-size:30px;margin:0 0 22px;color:#EDE6C8}} .full b{{color:#7BC67E}} .legend{{color:var(--mute);font-size:16px}} button{{font:inherit;font-size:26px;padding:16px 34px;border-radius:12px;border:0;background:var(--g);color:#0f1512;font-weight:700;cursor:pointer}}
 button.done{{background:var(--c)}} .cap{{position:fixed;left:0;right:0;bottom:0;padding:22px 8vw 28px;background:rgba(10,16,12,.92);color:var(--c);font-size:30px;font-weight:600;line-height:1.3;border-top:1px solid var(--line)}} .hint{{position:fixed;bottom:14px;right:18px;color:var(--mute);font-size:14px}}
 @media(max-width:700px){{.row{{grid-template-columns:1fr;}} .n{{text-align:left}}}}
 </style></head><body>
@@ -112,7 +125,7 @@ button.done{{background:var(--c)}} .cap{{position:fixed;left:0;right:0;bottom:0;
 <div class="mute">{html.escape(where)}{spend} · harness {html.escape(str(t.get("harness_id", "")))}</div></section>
 <section><div class="k">The fix</div><div class="diff">{_diff(s.get("diff", "")) or "No change."}</div>
 <div class="mute" style="margin-top:16px">Safety check: disclosure untouched, placeholders kept, under 30 lines.</div></section>
-<section><div class="k">Proof · same calls, before and after</div><h2>{score}</h2><div class="mute" style="margin:-12px 0 18px">{html.escape(evidence)}</div>{"".join(bars)}
+<section><div class="k">Proof · same calls, before and after</div><h2>{score}</h2><div class="mute" style="margin:-12px 0 18px">{evidence}</div>{full}{"".join(bars)}
 <div class="legend">grey = before · green = after</div></section>
 <section><div class="k">7am</div><h1>Nothing went live.</h1><h2 class="mute">The fix waits for a person.</h2>
 <div>{approve_button}</div></section>

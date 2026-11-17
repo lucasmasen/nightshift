@@ -40,20 +40,24 @@ the site folder with `vercel deploy --prod`).
 for the side-by-side, add its ID as a second line.
 
 ## Post drafts (Lucas's voice; add the project link once the project page exists)
-Real numbers, night 1 (11/16): fresh re-test 23/32 to 29/32 (72% to 91%), burst-pipe/failed-alert call 1/4 to 4/4,
-~5% chance it's luck. Simulated calls; say so.
+Lead number (Lucas picked it 11/17): night 1's fix on every test case, 140/178 to 153/178 (79% to 86%), ~5% chance
+it's luck (verify run 11/17). Close-up: 23/32 to 29/32 on the cases it fixed. Simulated calls; say so. Don't lead
+with the burst-pipe case's 1/4 to 4/4: on 11/17 the unfixed prompt scored 3/4 on it, so it's noisy.
 
-**X (must include the project link + #HarnessRouter #UHP #BigHackGame to count):**
-> my ai receptionist told a test caller with a burst pipe "the call will go to the number you're calling from." the alert had failed. nobody was coming.
-> built nightshift to catch that overnight. it found the cause, changed 4 lines, and the burst pipe test went from 1 of 4 to 4 of 4
+**X (must include the project link + #HarnessRouter #UHP #BigHackGame to count; 276/280):**
+> my ai receptionist told a burst pipe caller "i'm letting the team know right now." the alert had failed. nobody was coming.
+>
+> nightshift fixes that overnight. on all 178 test calls: 79% passed before its fix, 86% after.
+>
 > [project link]
-> #HarnessRouter #UHP #BigHackGame #BeatStanford
+> #HarnessRouter #UHP #BigHackGame
 
 **LinkedIn (paste the post's link in the project's "Posted on LinkedIn?" field):**
 > my ai phone receptionist for plumbers made a promise it couldn't keep.
 > a simulated caller had a burst pipe. the alert to the plumber failed. the ai still said "i'm letting the team know right now." nobody was coming.
 > so for the big hack game i built nightshift. every night it reads the agent's calls, sends the failures to a claude code agent on harnessrouter, fixes the instructions, and re-tests the fix on fresh calls before anyone wakes up. nothing goes live until a person approves.
-> night 1: 72% to 91% of fresh test calls passed. the burst pipe call went from 1 of 4 to 4 of 4. odds that's luck: about 5%.
+> night 1's fix, run on all 178 test calls: 79% passed before, 86% after. odds that's luck: about 5%.
+> it also works on other voice agents: point it at a prompt and a folder of call transcripts and it finds the bad calls itself.
 > building for berkeley.
 > [project link]
 > #HarnessRouter #UHP #BigHackGame #BeatStanford
