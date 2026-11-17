@@ -742,6 +742,18 @@ class AgentRegistryTests(unittest.TestCase):
                 agents.DIR = old
 
 
+class StatusTests(unittest.TestCase):
+    def test_next_at_and_waiting(self):
+        from datetime import datetime
+        from nightshift import status
+        self.assertEqual(status.next_at(2, now=datetime(2026, 11, 17, 15, 0)), datetime(2026, 11, 18, 2, 0))
+        self.assertEqual(status.next_at(2, now=datetime(2026, 11, 18, 1, 0)), datetime(2026, 11, 18, 2, 0))
+        nights = [(Path("a"), {"verdict": "Ready for approval"}), (Path("b"), {"verdict": "Ready", "approved": {}}),
+                  (Path("c"), {"verdict": "Don't approve"}),
+                  (Path("d"), {"verdict": "Fix proposed", "trace": {"where": "mock"}})]
+        self.assertEqual([d.name for d, _ in status.waiting(nights)], ["a"])
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

@@ -360,6 +360,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--by", default="lucas")
     ap.add_argument("--force", action="store_true")
     sub.add_parser("dashboard", help="Rebuild runs/index.html")
+    st = sub.add_parser("status", help="What's waiting on you, today's test budget, the next runs")
+    st.add_argument("--calls", action="store_true", help="Also check the demo line for new real calls (read-only)")
     sub.add_parser("preflight", help="Demo Day check: site, video, pages, web app, schedule; builds offline/ copy")
     sv = sub.add_parser("serve", help="Local web app with real Approve/Reject buttons (127.0.0.1 only)")
     sv.add_argument("--port", type=int, default=8765)
@@ -527,6 +529,9 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "stage":
         log(str(stage.write(Path(a.dir))))
         return 0
+    if a.cmd == "status":
+        from . import status
+        return status.run(check_calls=a.calls, log=log)
     if a.cmd == "preflight":
         from . import preflight
         return preflight.run(log=log)
