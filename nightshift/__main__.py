@@ -56,6 +56,8 @@ def check(live: bool = False) -> int:
 def pick_guard_cases(run: collect.Run, failed: list[str], n: int) -> list[str]:
     """Cases that passed every time, re-run after the fix to catch regressions. Spread across the list."""
     passing = [c for c, (p, t) in run.case_scores().items() if p == t and c not in failed]
+    if n <= 0:
+        return []
     if len(passing) <= n:
         return passing
     step = len(passing) / n
@@ -67,6 +69,10 @@ def score_dict(run: collect.Run) -> dict:
 
 
 def night(args: argparse.Namespace) -> int:
+    problems = retest.checkout_ok()
+    if problems:
+        log("Not starting: " + "; ".join(problems))
+        return 1
     stamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
     out = config.RUNS / stamp
     out.mkdir(parents=True)
@@ -84,11 +90,11 @@ def night(args: argparse.Namespace) -> int:
     for c in base.failures:
         counts[c.case] = counts.get(c.case, 0) + 1
     # Fix the cases that failed most first; a few per night keeps the fix small and the re-test cheap.
-    failed = sorted(sorted(counts, key=lambda c: -counts[c])[:args.max_cases])
+    failed = sorted(sorted(counts, key=lambda c: -counts[c])[:max(1, args.max_cases)])
     if len(counts) > len(failed):
         log(f"   {len(counts)} cases failed; tonight fixes the {len(failed)} that failed most (--max-cases)")
     summary: dict = {"date": stamp, "agent": "Godfrey (Sunset Plumbing demo line)", "baseline_passed": base.passed,
-                     "baseline_total": base.total, "baseline_file": base.path.name, "failed_cases": failed}
+                     "baseline_total": base.total, "baseline_file": base.path.name, "baseline_path": str(base.path.resolve()), "failed_cases": failed}
     if not failed:
         summary["verdict"] = "Clean night: every call passed. Nothing to fix."
         return finish(out, summary)
@@ -140,6 +146,10 @@ def night(args: argparse.Namespace) -> int:
 def verdict(summary: dict) -> str:
     """Ready only when the gain is unlikely to be luck (one-sided Fisher p < 0.2) and no passing case got worse."""
     b, a = summary["before"], summary["after"]
+    if b["total"] != a["total"] or not a["total"]:
+        summary["p_value"], summary["evidence"] = None, "inconclusive"
+        return (f"Inconclusive: before and after ran different numbers of calls ({b['total']} vs {a['total']}), "
+                "so they can't be compared. Re-run the proof.")
     p = stats.fisher_improved(b["passed"], b["total"], a["passed"], a["total"])
     summary["p_value"], summary["evidence"] = round(p, 3), stats.strength(p)
     gain, worse, broke = a["passed"] - b["passed"], summary.get("worse", []), summary.get("broke", [])
@@ -235,7 +245,8 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "retest":
         d = Path(a.dir)
         summ = dashboard.load(d)
-        base = collect.parse(config.TEST_CHECKOUT / "demo_line" / "suite_runs" / summ["baseline_file"])
+        base = collect.parse(Path(summ.get("baseline_path") or
+                                  config.TEST_CHECKOUT / "demo_line" / "suite_runs" / summ["baseline_file"]))
         cases = summ["failed_cases"] + pick_guard_cases(base, summ["failed_cases"], a.guards)
         summ.pop("approved", None)
         try:

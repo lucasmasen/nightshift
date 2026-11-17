@@ -6,7 +6,9 @@ own $2/day cap, which counts every demo-factory* checkout.
 """
 from __future__ import annotations
 
+import os
 import re
+import signal
 import subprocess
 from dataclasses import dataclass
 
@@ -33,10 +35,14 @@ def checkout_ok() -> list[str]:
     if not (config.TEST_CHECKOUT / config.PROMPT_REL).exists():
         problems.append(f"Test checkout missing: {config.TEST_CHECKOUT}")
         return problems
-    if config.TEST_CHECKOUT.resolve() == (config.WORKSPACE / "demo-factory").resolve():
+    real = config.WORKSPACE / "demo-factory"
+    if real.exists() and os.path.samefile(config.TEST_CHECKOUT, real):
         problems.append("The test checkout must not be demo-factory/ itself.")
     # No git here on purpose (11/16: an Xcode update made /usr/bin/git refuse to run until its license is accepted).
-    if REAL_PROMPT.exists() and (config.TEST_CHECKOUT / config.PROMPT_REL).read_text() != REAL_PROMPT.read_text():
+    test_prompt = config.TEST_CHECKOUT / config.PROMPT_REL
+    if REAL_PROMPT.exists() and os.path.samefile(test_prompt, REAL_PROMPT):
+        problems.append("The test checkout's prompt.md is the real one (symlink?).")
+    elif REAL_PROMPT.exists() and test_prompt.read_text() != REAL_PROMPT.read_text():
         problems.append("The test checkout's prompt.md differs from demo-factory's; a candidate may not have been restored.")
     if not config.PYTHON.exists():
         problems.append(f"Python not found: {config.PYTHON}")
@@ -62,6 +68,10 @@ def run_suite(cases: list[str], prompt_text: str | None = None, repeat: int = 1,
         # Never reuse earlier results: the failed calls that started the night would otherwise count in "before",
         # and since they were picked for failing, "before" would look worse than it is (11/16 lesson).
         cmd.append("--fresh")
+    def _term(signum, frame):  # make kill/Ctrl-C still run the restore below
+        raise SystemExit(128 + signum)
+
+    old_handler = signal.signal(signal.SIGTERM, _term)
     try:
         if prompt_text is not None:
             target.write_text(prompt_text)
@@ -69,12 +79,15 @@ def run_suite(cases: list[str], prompt_text: str | None = None, repeat: int = 1,
         p = subprocess.run(cmd, cwd=config.TEST_CHECKOUT, capture_output=True, text=True, timeout=3600)
     finally:
         target.write_text(original)  # always put the original back, even if the simulator crashed
+        signal.signal(signal.SIGTERM, old_handler)
     out = p.stdout + p.stderr
     for line in out.splitlines():
         if line.startswith(("Today (Pacific)", "Refused", "Stopping", "Paid calls")):
             log("  " + line)
     if p.returncode == 2 and "Refused" in out:
-        raise Refused(next(l for l in out.splitlines() if l.startswith("Refused")))
+        raise Refused(next((ln.strip() for ln in out.splitlines() if "Refused" in ln), "Refused by the cap"))
+    if "Stopping: today's" in out:
+        raise Refused("The $2/day cap stopped the run partway; the numbers would not compare fairly.")
     m = TRANSCRIPTS.search(out)
     if not m:
         raise RuntimeError("The simulator finished without a run file:\n" + out[-1500:])

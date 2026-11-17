@@ -70,9 +70,33 @@ def parse(path: Path) -> Run:
                 c.transcript = "\n".join(lines).strip()
                 del queue[i]
                 break
+    _fill_reused(Path(path), calls)
     passed = int(m.group(1)) if m else sum(c.passed for c in calls)
     total = int(m.group(2)) if m else len(calls)
     return Run(path=Path(path), passed=passed, total=total, calls=calls)
+
+
+REUSED = re.compile(r"^Reused from (\S+?\.md)#([a-z0-9_]+)\s*$")
+
+
+def _fill_reused(path: Path, calls: list[Call], depth: int = 0) -> None:
+    """A reused call's transcript is one line pointing at an earlier run file; copy the real transcript from there."""
+    cache: dict[Path, Run] = {}
+    for c in calls:
+        m = REUSED.match(c.transcript.strip())
+        if not m or depth > 2:
+            continue
+        rel = Path(m.group(1))
+        candidates = [path.parent / rel.name, path.parent.parent.parent / rel]
+        src = next((p for p in candidates if p.exists()), None)
+        if not src:
+            continue
+        if src not in cache:
+            cache[src] = parse(src)
+        hit = next((x for x in cache[src].calls if x.case == m.group(2) and x.passed == c.passed
+                    and not REUSED.match(x.transcript.strip())), None)
+        if hit:
+            c.transcript = hit.transcript
 
 
 def failures_markdown(run: Run, limit: int = 12) -> str:

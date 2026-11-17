@@ -31,6 +31,11 @@ def approve(night_dir: Path, by: str, force: bool = False) -> tuple[bool, str]:
         return False, "This fix failed the safety check; it can't be approved."
     if not (night_dir / "prompt.proposed.md").exists():
         return False, "No proposed prompt in this night."
+    real = config.WORKSPACE / "demo-factory" / config.PROMPT_REL
+    before = night_dir / "prompt.before.md"
+    if real.exists() and before.exists() and real.read_text() != before.read_text():
+        return False, ("The real prompt changed since this night ran, so this fix was made against an old version. "
+                       "Run a new night instead of approving this one.")
     ready = str(s.get("verdict", "")).startswith("Ready for approval")
     if not ready and not force:
         return False, "Not marked ready (the re-test didn't show a clean improvement). Use --force to approve anyway."
@@ -77,7 +82,7 @@ def render() -> str:
         ba = f"{b['passed']}/{b['total']} &rarr; {a['passed']}/{a['total']}" if b and a else "-"
         status = "approved" if s.get("approved") else ("ready" if str(s.get("verdict", "")).startswith("Ready") else "")
         mock = " (mock)" if (s.get("trace") or {}).get("where") == "mock" else ""
-        rows.append(f"<tr><td><a href='{d.name}/report.html'>{html.escape(d.name)}</a>{mock}</td><td>{base}</td>"
+        rows.append(f"<tr><td><a href='{html.escape(d.name)}/report.html'>{html.escape(d.name)}</a>{mock}</td><td>{base}</td>"
                     f"<td>{ba}</td><td class='{status}'>{status or '-'}</td><td>{html.escape(str(s.get('verdict', ''))[:120])}</td></tr>")
         if s.get("baseline_total") and not mock:
             points.append((d.name, s["baseline_passed"] / s["baseline_total"]))

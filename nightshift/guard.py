@@ -12,8 +12,10 @@ PLACEHOLDER = re.compile(r"\$[a-z_]+")
 
 
 def changed_lines(old: str, new: str) -> int:
-    diff = difflib.unified_diff(old.splitlines(), new.splitlines(), lineterm="", n=0)
-    return sum(1 for d in diff if d[:1] in "+-" and not d.startswith(("+++", "---")))
+    """Lines changed, counting a reworded line once (the bigger of lines removed and lines added)."""
+    diff = [d for d in difflib.unified_diff(old.splitlines(), new.splitlines(), lineterm="", n=0)
+            if not d.startswith(("+++", "---"))]
+    return max(sum(d.startswith("+") for d in diff), sum(d.startswith("-") for d in diff))
 
 
 def diff_text(old: str, new: str) -> str:

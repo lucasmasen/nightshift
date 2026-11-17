@@ -9,12 +9,40 @@ from __future__ import annotations
 
 import re
 import shutil
+import subprocess
 from pathlib import Path
 
 from . import config, dashboard
 
 SITE = config.PROJECT / "site"
 PHONE = re.compile(r"(?<!\d)(?:\+?1[ -.]?)?\(?(\d{3})\)?[ -.]?(\d{3})[ -.]?(\d{4})(?!\d)")
+
+
+FOUND = re.compile(r"^\s+\[([A-Z_]+)\] '(.*)'\s*$")
+
+
+def redact_scan(path: Path) -> list[tuple[str, str]]:
+    """demo-factory's redact tool knows real shop names and number/address formats (--keep-demo allows the 555
+    demos). Returns (kind, text) for each find, minus UNIT, which only ever matches CSS colors and "#1" here."""
+    df = config.WORKSPACE / "demo-factory"
+    py = df / ".venv" / "bin" / "python"
+    if not py.exists():
+        return [("TOOL", "redact tool not found; check by hand")]
+    p = subprocess.run([str(py), "-m", "demo_line.redact", str(path), "--check", "--keep-demo"], cwd=df,
+                       capture_output=True, text=True)
+    finds = [(m.group(1), m.group(2)) for m in map(FOUND.match, p.stdout.splitlines()) if m]
+    return [(k, t) for k, t in finds if k != "UNIT"]
+
+
+def mask(text: str, finds: list[tuple[str, str]]) -> tuple[str, list[tuple[str, str]]]:
+    """Replace each address/phone find with a neutral word; anything else is held back for a person."""
+    held = []
+    for kind, found in finds:
+        if kind in ("ADDRESS", "PHONE", "NUMBER") and found in text:
+            text = text.replace(found, "[address]" if kind == "ADDRESS" else "[number]")
+        else:
+            held.append((kind, found))
+    return text, held
 
 
 def problems(text: str) -> list[str]:
@@ -42,8 +70,8 @@ def build(nights: list[str]) -> tuple[Path, list[str]]:
         dst.mkdir()
         for page in ("report.html", "stage.html"):
             if (src / page).exists():
-                text = (src / page).read_text()
-                found = problems(text)
+                text, held = mask((src / page).read_text(), redact_scan(src / page))
+                found = problems(text) + [f"{k}: {t[:40]}" for k, t in held]
                 if found:
                     issues += [f"{name}/{page}: {f}" for f in found]
                     continue

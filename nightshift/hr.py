@@ -11,6 +11,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from urllib.parse import urlsplit
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -18,7 +19,8 @@ from typing import Any, Callable
 from . import config
 
 TERMINAL = {"completed", "incomplete", "failed", "cancelled"}
-RETRYABLE = {429, 502, 503, 504}
+RETRYABLE = {429, 502, 503, 504, 599}  # 599 = network error (no answer)
+API_HOST = urlsplit(config.API_BASE).hostname
 
 
 class HRError(RuntimeError):
@@ -31,13 +33,38 @@ class HRError(RuntimeError):
 Transport = Callable[[str, str, dict, bytes | None], tuple[int, dict, bytes]]
 
 
+class _NoKeyOnRedirect(urllib.request.HTTPRedirectHandler):
+    """Follow redirects, but never carry the HarnessRouter key to a different host (e.g. a storage service)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and urlsplit(newurl).hostname != API_HOST:
+            for name in list(new.headers):
+                if name.lower() == "authorization":
+                    del new.headers[name]
+            new.unredirected_hdrs.pop("Authorization", None)
+        return new
+
+
+_OPENER = urllib.request.build_opener(_NoKeyOnRedirect)
+
+
 def urllib_transport(method: str, url: str, headers: dict, body: bytes | None) -> tuple[int, dict, bytes]:
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with _OPENER.open(req, timeout=120) as r:
             return r.status, dict(r.headers), r.read()
     except urllib.error.HTTPError as e:
         return e.code, dict(e.headers or {}), e.read()
+    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+        return 599, {}, json.dumps({"error": {"code": "network_error", "message": str(e)[:200]}}).encode()
+
+
+def _retry_after(headers: dict, default: float) -> float:
+    try:
+        return max(0.0, min(60.0, float(headers.get("Retry-After", default))))
+    except (TypeError, ValueError):
+        return default
 
 
 @dataclass
@@ -53,9 +80,10 @@ class Client:
         return h
 
     def request(self, method: str, path: str, body: dict | None = None, *, raw: bytes | None = None,
-                headers: dict | None = None, retry: bool | None = None) -> Any:
+                headers: dict | None = None, retry: bool | None = None, as_bytes: bool = False) -> Any:
         url = path if path.startswith("http") else self.base + path
-        if not url.startswith(config.API_BASE):
+        parts = urlsplit(url)
+        if parts.scheme != "https" or parts.hostname != API_HOST or parts.username or parts.password:
             raise ValueError("Refusing to send the HarnessRouter key to another host: " + url)
         data = raw
         h = self._headers(headers)
@@ -64,10 +92,10 @@ class Client:
             h["Content-Type"] = "application/json"
         retry = (method == "GET") if retry is None else retry
         status, rh, out = 0, {}, b""
-        for attempt in range(4):
+        for attempt in range(5):
             status, rh, out = self.transport(method, url, h, data)
-            if status in RETRYABLE and retry and attempt < 3:
-                self.sleep(float(rh.get("Retry-After", 2 ** attempt)))
+            if status in RETRYABLE and retry and attempt < 4:
+                self.sleep(_retry_after(rh, 2.0 ** attempt))
                 continue
             break
         if status >= 400:
@@ -76,8 +104,10 @@ class Client:
             except (ValueError, AttributeError):
                 err = {}
             raise HRError(status, err.get("code", "unknown"), err.get("message", out[:200].decode("utf-8", "replace")))
+        if as_bytes:
+            return out
         ctype = {k.lower(): v for k, v in rh.items()}.get("content-type", "")
-        return json.loads(out) if "json" in ctype or out[:1] in (b"{", b"[") else out
+        return json.loads(out) if "json" in ctype else out
 
     # ---- workspace ---------------------------------------------------------------------------------------------
     def me(self) -> dict:
@@ -178,7 +208,7 @@ class Client:
         return self.request("GET", f"/v1/sessions/{session_id}/files").get("files", [])
 
     def download(self, url: str) -> bytes:
-        return self.request("GET", url)  # host is checked in request()
+        return self.request("GET", url, as_bytes=True)  # host is checked in request()
 
 
 def final_text(response: dict) -> str:

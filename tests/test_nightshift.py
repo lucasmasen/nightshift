@@ -245,3 +245,54 @@ class StatsTests(unittest.TestCase):
         self.assertTrue(verdict(s).startswith("Better"))
         s = {"before": {"passed": 30, "total": 32}, "after": {"passed": 31, "total": 32}}
         self.assertIn("could be luck", verdict(s))
+
+
+class ReviewFixTests(unittest.TestCase):
+    """Regression tests for the 11/16 bug review."""
+
+    def test_lookalike_hosts_refused(self):
+        client = hr.Client("sk-hr-test", transport=FakeHR())
+        for url in ("https://api.harnessrouter.ai.evil.com/x", "https://api.harnessrouter.ai@evil.com/x",
+                    "http://api.harnessrouter.ai/x"):
+            with self.assertRaises(ValueError):
+                client.request("GET", url)
+
+    def test_redirect_drops_key_on_new_host(self):
+        import urllib.request
+        h = hr._NoKeyOnRedirect()
+        req = urllib.request.Request("https://api.harnessrouter.ai/v1/x", headers={"Authorization": "Bearer k"})
+        new = h.redirect_request(req, None, 302, "Found", {}, "https://storage.example.com/f")
+        self.assertNotIn("Authorization", new.headers)
+        same = h.redirect_request(req, None, 302, "Found", {}, "https://api.harnessrouter.ai/v1/y")
+        self.assertIn("Authorization", same.headers)
+
+    def test_network_error_is_retried(self):
+        calls = []
+
+        def flaky(method, url, headers, body):
+            calls.append(1)
+            if len(calls) < 3:
+                return 599, {}, b'{"error": {"code": "network_error", "message": "x"}}'
+            return 200, {"Content-Type": "application/json"}, b'{"workspace_name": "W"}'
+        self.assertEqual(hr.Client("k", transport=flaky, sleep=lambda s: None).me()["workspace_name"], "W")
+
+    def test_json_looking_file_stays_bytes(self):
+        client = hr.Client("k", transport=lambda *a: (200, {"Content-Type": "text/markdown"}, b"{not json"))
+        self.assertEqual(client.download("https://api.harnessrouter.ai/v1/containers/s/files/f/content"), b"{not json")
+
+    def test_reword_counts_once(self):
+        old = "\n".join(f"line {i}" for i in range(20))
+        new = "\n".join(f"LINE {i}" for i in range(20))
+        self.assertEqual(guard.changed_lines(old, new), 20)
+        self.assertEqual(guard.check(old, new), [])
+
+    def test_unequal_totals_inconclusive(self):
+        from nightshift.__main__ import verdict
+        s = {"before": {"passed": 10, "total": 20}, "after": {"passed": 15, "total": 16}}
+        self.assertTrue(verdict(s).startswith("Inconclusive"))
+
+    def test_zero_guards(self):
+        from nightshift.__main__ import pick_guard_cases
+        with tempfile.TemporaryDirectory() as d:
+            run = collect.parse(write(Path(d), "r.md", RUN))
+        self.assertEqual(pick_guard_cases(run, ["book_earliest"], 0), [])
