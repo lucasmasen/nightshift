@@ -65,7 +65,7 @@ def run(real_days: int = 1, max_cases: int = 4, send_email: bool = True, log=pri
     log(f"Nightshift nightly {datetime.now():%Y-%m-%d %H:%M}")
     items: list[dict] = []
 
-    code, out, night = _run(["night", "--real-days", str(real_days), "--max-cases", "3", "--guards", "2"], log)
+    code, out, night = _run(["night", "--real-days", str(real_days), "--new-only", "--max-cases", "3", "--guards", "2"], log)
     if night and (json.loads((night / "summary.json").read_text()).get("baseline_total") or 0) == 0:
         items.append({"title": "Real calls to the demo line", "night": None, "summary": None,
                       "note": "No one called the demo line since yesterday."})

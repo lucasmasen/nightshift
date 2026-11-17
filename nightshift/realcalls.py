@@ -45,6 +45,7 @@ class RealNight:
     flagged_calls: int
     flag_counts: dict[str, int]
     cases: list[str]  # simulator twins, most-flagged first
+    ids: list[str] = None  # the calls reviewed (short ids), so later nights can skip them
 
 
 def _run(args: list[str], stdin: str | None = None) -> str:
@@ -89,7 +90,27 @@ NINE11 = re.compile(r"\b9[\s-]?1[\s-]?1\b|\bnine[\s-]one[\s-]one\b", re.I)
 SEP = "\n\n=====NIGHTSHIFT-REPORT-STARTS=====\n\n"
 
 
-def full_transcripts(days: int) -> str:
+def drop_calls(report: str, skip: set[str]) -> str:
+    """The QA report without the sections for calls an earlier night already reviewed."""
+    if not skip:
+        return report
+    parts = re.split(r"(?=^## .+? · call \w+ · \d+s)", report, flags=re.M)
+    keep = [p for p in parts if not ((m := CALL.match(p)) and m.group(2)[:8] in skip)]
+    return "".join(keep)
+
+
+def seen_ids() -> set[str]:
+    """Call ids already reviewed by earlier real-call nights."""
+    out: set[str] = set()
+    for d in config.RUNS.glob("20*/summary.json") if config.RUNS.exists() else []:
+        try:
+            out |= set(json.loads(d.read_text()).get("call_ids") or [])
+        except ValueError:
+            continue
+    return out
+
+
+def full_transcripts(days: int, skip: set[str] | None = None) -> str:
     """The window's whole calls, so the redactor learns every name a caller gave ("this is X") before it cleans the
     report's short excerpts, where a name can appear with nothing marking it as one. Read-only; empty if it can't."""
     try:
@@ -102,7 +123,7 @@ def full_transcripts(days: int) -> str:
         calls = vapi_import._get("/call", key, {"assistantId": state["assistant_id"], "limit": 100,
                                                 "createdAtGt": since})
         parts = [f"## Call {c.get('id', '')[:8]} ({c.get('createdAt', '')[:16]} UTC)\n\n"
-                 + vapi_import.transcript(c, "Godfrey") for c in calls]
+                 + vapi_import.transcript(c, "Godfrey") for c in calls if c.get("id", "")[:8] not in (skip or set())]
         return "\n\n".join(p for p in parts if p.count("\n") >= 4)
     except Exception:  # noqa: BLE001 - best effort: the excerpt-only redaction still runs
         return ""
@@ -124,9 +145,11 @@ def redact(text: str, context: str = "") -> str:
     return redact_both(text, context)[0]
 
 
-def load(days: int, limit: int, report_file: Path | None = None) -> RealNight:
+def load(days: int, limit: int, report_file: Path | None = None, skip_seen: bool = False) -> RealNight:
     raw = report_file.read_text() if report_file else _run(["-m", "demo_line.real_call_qa", "--days", str(days), "--stdout"])
-    redacted, full = redact_both(raw, "" if report_file else full_transcripts(days))
+    skip = seen_ids() if skip_seen else set()
+    raw = drop_calls(raw, skip)
+    redacted, full = redact_both(raw, "" if report_file else full_transcripts(days, skip))
     calls, flagged, counts = parse(raw)
     head = ("# REAL calls to the demo line (not simulated)\n\nFirst, flags from automatic checks on the agent's text. "
             "They're heuristics: some are wrong, and they miss things. Then the full calls: read each one yourself and "
@@ -134,4 +157,5 @@ def load(days: int, limit: int, report_file: Path | None = None) -> RealNight:
             "over). Everything is redacted ([PHONE], [NAME], [ADDRESS]...). Calls may be older than the current prompt, "
             "so check prompt.md before changing anything.\n\n")
     tail = ("\n\n# Full calls (redacted)\n\n" + full) if full else ""
-    return RealNight(head + redacted + tail, calls, flagged, counts, twins(counts, limit))
+    ids = [m.group(2)[:8] for m in CALL.finditer(raw)]
+    return RealNight(head + redacted + tail, calls, flagged, counts, twins(counts, limit), ids)

@@ -579,6 +579,17 @@ class VapiImportTests(unittest.TestCase):
         self.assertEqual(vapi_import.system_prompt(a), "Be kind.")
 
 
+class SeenCallsTests(unittest.TestCase):
+    def test_drop_calls(self):
+        from nightshift import realcalls
+        rep = "# head\n## 11/17 · call aaaaaaaa11 · 10s\n- x\n## 11/18 · call bbbbbbbb22 · 20s\n- y\n"
+        out = realcalls.drop_calls(rep, {"aaaaaaaa"})
+        self.assertNotIn("aaaaaaaa", out)
+        self.assertIn("bbbbbbbb22", out)
+        self.assertEqual(realcalls.parse(out)[0], 1)
+        self.assertEqual(realcalls.drop_calls(rep, set()), rep)
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

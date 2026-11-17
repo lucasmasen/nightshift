@@ -166,11 +166,13 @@ DEFAULT_GUARDS = ["book_basic", "reschedule_after_booking", "skeptic_badmouth_co
 def real_night(args: argparse.Namespace, out: Path, stamp: str) -> int:
     """Night from the demo line's real calls: redacted real-call flags go to the fixer; simulated twins prove it."""
     log(f"1. Calls: reading real calls from the last {args.real_days or '?'} days (Vapi, read-only), redacting...")
-    rn = realcalls.load(args.real_days or 0, max(1, args.max_cases), Path(args.real_file) if args.real_file else None)
+    rn = realcalls.load(args.real_days or 0, max(1, args.max_cases), Path(args.real_file) if args.real_file else None,
+                        skip_seen=getattr(args, "new_only", False))
     log(f"   {rn.calls} real calls, {rn.flagged_calls} flagged: " + ", ".join(f"{k} x{v}" for k, v in rn.flag_counts.items()))
     summary: dict = {"date": stamp, "agent": "Godfrey (Sunset Plumbing demo line), REAL calls", "mode": "real",
                      "baseline_passed": rn.calls - rn.flagged_calls, "baseline_total": rn.calls,
-                     "baseline_file": "real calls", "flag_counts": rn.flag_counts, "failed_cases": rn.cases}
+                     "baseline_file": "real calls", "flag_counts": rn.flag_counts, "failed_cases": rn.cases,
+                     "call_ids": rn.ids or []}
     if not rn.cases:
         summary["verdict"] = "Clean night: no real call was flagged."
         return finish(out, summary)
@@ -338,6 +340,7 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--base", help="Harness base: claude-code (default) or codex")
     n.add_argument("--on-top-of", help="An approved night to build on: use its fixed prompt, skip the cases it fixed")
     n.add_argument("--real-days", type=int, help="Start from the demo line's REAL calls of the last N days")
+    n.add_argument("--new-only", action="store_true", help="Real calls: skip calls an earlier night already reviewed")
     n.add_argument("--real-file", help="A saved real_call_qa report to start from (instead of fetching)")
     n.add_argument("--mock", action="store_true", help="Local stand-in for the HarnessRouter agent ($0)")
     n.add_argument("--no-retest", action="store_true", help="Stop after the safety check (no simulated calls)")
