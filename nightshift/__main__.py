@@ -350,6 +350,10 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--guards", type=int, default=3)
     ex = sub.add_parser("export", help="Build site/ (public static copy) from the named nights; never deploys")
     ex.add_argument("nights", nargs="+")
+    rc = sub.add_parser("recheck", help="Re-run the cases that flipped to fail in verify, old vs new prompt (~$0.45)")
+    rc.add_argument("dir")
+    rc.add_argument("cases", nargs="*")
+    rc.add_argument("--repeat", type=int, default=4)
     ag = sub.add_parser("agent", help="Any voice agent: a folder with prompt.md + calls/ transcripts (see anyagent.py)")
     ag.add_argument("dir")
     ag.add_argument("--mock", action="store_true", help="No HarnessRouter call, no spend")
@@ -396,6 +400,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if a.cmd == "agent":
         return agent_night(a)
+    if a.cmd == "recheck":
+        try:
+            ops.recheck(Path(a.dir), a.cases, a.repeat, log=log)
+        except retest.Refused as e:
+            log(f"Refused by the $2/day cap: {e}")
+            return 1
+        return 0
     if a.cmd == "approve":
         ok, msg = dashboard.approve(Path(a.dir), a.by, a.force)
         log(msg)

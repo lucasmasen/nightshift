@@ -449,6 +449,31 @@ class AnyAgentTests(unittest.TestCase):
                 config.RUNS, lessons.LESSONS = old_runs, old_lessons
 
 
+class RecheckTests(unittest.TestCase):
+    def test_recheck_calls_each_case(self):
+        from nightshift import collect, ops, retest
+        with tempfile.TemporaryDirectory() as d:
+            night = Path(d) / "2026-11-16-000000"
+            night.mkdir()
+            (night / "prompt.before.md").write_text("old")
+            (night / "prompt.proposed.md").write_text("new")
+            (night / "summary.json").write_text(json.dumps({"verify": {"newly_failing": ["kid", "joke"]}}))
+
+            def fake(cases, prompt, repeat, log, fresh):
+                score = {"old": {"kid": 4, "joke": 3}, "new": {"kid": 0, "joke": 2}}[prompt]
+                calls = [collect.Call(c, i < score[c], "") for c in cases for i in range(repeat)]
+                run = collect.Run(night / f"{prompt}.md", sum(x.passed for x in calls), len(calls), calls)
+                return retest.Result(run, "")
+            real, retest.run_suite = retest.run_suite, fake
+            try:
+                res = ops.recheck(night, log=lambda m: None)
+            finally:
+                retest.run_suite = real
+            self.assertEqual(res["cases"]["kid"]["call"], "really worse")
+            self.assertEqual(res["cases"]["joke"]["call"], "worse, could be noise")
+            self.assertEqual(res["really_worse"], ["kid"])
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

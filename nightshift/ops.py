@@ -12,7 +12,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import collect, config, cost, dashboard, export, fixer, guard, retest
+from . import collect, config, cost, dashboard, export, fixer, guard, retest, stats
 from .hr import Client
 
 DEPLOY = config.PROJECT / ".deploy"  # git-ignored; holds the Vercel project link (.vercel/) and the built site
@@ -231,6 +231,39 @@ def arena_prove(night_dir: Path, repeat: int = 4, log=print) -> dict:
         e["after"] = {"passed": r.run.passed, "total": r.run.total, "file": r.run.path.name}
         save()
     save()
+    return res
+
+
+# ---- recheck: did the cases that flipped in verify really get worse? ---------------------------------------------
+def recheck(night_dir: Path, cases: list[str] | None = None, repeat: int = 4, log=print) -> dict:
+    """Verify runs each case once, so a case that flips pass->fail may be noise. Re-run those cases `repeat` times
+    with the old and the new prompt and say, per case, whether it's really worse. Defaults to verify's
+    newly_failing list. Saved as summary["recheck"]; it never changes the night's main proof."""
+    s = dashboard.load(night_dir)
+    cases = cases or (s.get("verify") or {}).get("newly_failing") or []
+    if not cases:
+        raise RuntimeError("Nothing to re-check: verify found no newly failing cases.")
+    log(f"Re-check {night_dir.name}: {len(cases)} cases x {repeat} calls, old prompt then new")
+    old = (night_dir / "prompt.before.md").read_text()
+    new = (night_dir / "prompt.proposed.md").read_text()
+    b = retest.run_suite(cases, old, repeat=repeat, log=log, fresh=True).run
+    a = retest.run_suite(cases, new, repeat=repeat, log=log, fresh=True).run
+    bc, ac = b.case_scores(), a.case_scores()
+    rows = {}
+    for c in cases:
+        (bp, bt), (ap, at) = bc.get(c, (0, 0)), ac.get(c, (0, 0))
+        worse_p = stats.fisher_improved(ap, at, bp, bt) if bt and at else None  # chance "worse" is luck
+        rows[c] = {"before": [bp, bt], "after": [ap, at],
+                   "call": ("really worse" if worse_p is not None and worse_p < 0.2 and bp > ap else
+                            "worse, could be noise" if bp > ap else "not worse")}
+    res = {"cases": rows, "before": f"{b.passed}/{b.total}", "after": f"{a.passed}/{a.total}",
+           "files": [b.path.name, a.path.name], "repeat": repeat,
+           "really_worse": [c for c, r in rows.items() if r["call"] == "really worse"]}
+    s["recheck"] = res
+    dashboard.save(night_dir, s)
+    for c, r in rows.items():
+        log(f"  {c}: {r['before'][0]}/{r['before'][1]} -> {r['after'][0]}/{r['after'][1]}  {r['call']}")
+    log("Really worse: " + (", ".join(res["really_worse"]) or "none") + ". Fix those before going live.")
     return res
 
 

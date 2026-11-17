@@ -24,6 +24,10 @@ def captions(s: dict) -> list[tuple[str, float]]:
              f"{a.get('passed')}/{a.get('total')}." if a else "The proof re-runs the same calls before and after.")
     if s.get("p_value") is not None:
         proof += f" Chance it's luck: about {s['p_value']:.0%}."
+    v = s.get("verify") or {}
+    if v.get("complete") and v.get("with_fix"):  # the full check on every case is the bigger sample: lead with it
+        proof = (f"Then the fix ran on all {v['with_fix'].split('/')[1]} test calls: "
+                 f"{v['baseline_rate']:.0%} passed before, {v['with_fix_rate']:.0%} after.")
     return [
         (f"My AI receptionist for plumbers took {total} {'real' if real else 'test'} calls. "
          f"{total - passed} went wrong, and nobody was awake to notice.", 6),
