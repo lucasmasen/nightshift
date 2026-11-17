@@ -169,13 +169,13 @@ def verdict(summary: dict) -> str:
     summary["p_value"], summary["evidence"] = round(p, 3), stats.strength(p)
     gain, worse, broke = a["passed"] - b["passed"], summary.get("worse", []), summary.get("broke", [])
     tail = f" Evidence: {summary['evidence']} (p={p:.2f})." + (f" Slightly worse on {', '.join(worse)}." if worse else "")
-    if gain > 0 and p < 0.2 and not broke:
-        return f"Ready for approval: {b['passed']}/{b['total']} to {a['passed']}/{a['total']} on fresh re-runs." + tail
     bc, ac = b.get("cases", {}), a.get("cases", {})
     big_drops = [c for c in ac if c in bc and bc[c][0] - ac[c][0] >= 2]
     if big_drops:
         return (f"Don't approve: {', '.join(big_drops)} dropped by 2 or more passes "
                 f"({b['passed']} to {a['passed']} of {a['total']} overall)." + tail)
+    if gain > 0 and p < 0.2 and not broke:
+        return f"Ready for approval: {b['passed']}/{b['total']} to {a['passed']}/{a['total']} on fresh re-runs." + tail
     if gain > 0:
         why = f"it made {', '.join(broke)} worse" if broke else "the gain could be luck at this sample size"
         return f"Better ({b['passed']} to {a['passed']} of {a['total']}), but {why}. Review before approving." + tail

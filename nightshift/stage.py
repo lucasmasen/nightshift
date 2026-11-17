@@ -23,7 +23,6 @@ def first_failure(failures_md: str) -> tuple[str, str, list[str]]:
         return "", "", []
     pick = next((x for x in sections if x[0] in HIGH_STAKES), sections[0])
     lines = [ln[2:] for ln in pick[2].splitlines() if ln.startswith("- ")]
-    err = next((i for i, ln in enumerate(lines) if "**error**" in ln), None)
     quotes = [q for q in re.findall(r'"([^"]{8,})"', pick[1])]
     marked = [("!" if any(q[:40] in ln for q in quotes) else "") + ln for ln in lines]
     if sum(m.startswith("!") for m in marked) >= 2 and len(marked) > 9:
