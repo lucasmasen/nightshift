@@ -15,12 +15,14 @@ HEADER = ("# Lessons from rejected fixes\n\nEach entry is a past fix that was re
           "change again; if a failure still needs fixing, find a different way that keeps these cases passing.\n")
 
 
-def read(path: Path = LESSONS) -> str:
+def read(path: Path | None = None) -> str:
+    path = path or LESSONS
     return path.read_text() if path.exists() else ""
 
 
-def add(night: str, text: str, by: str = "nightshift", path: Path = LESSONS) -> bool:
+def add(night: str, text: str, by: str = "nightshift", path: Path | None = None) -> bool:
     """Append one lesson; skips an exact duplicate (same night, same text). Returns True if written."""
+    path = path or LESSONS
     body = read(path) or HEADER
     entry = f"\n## {night} ({by}, {datetime.now():%b %d %I:%M%p})\n{text.strip()}\n"
     if f"## {night} ({by}," in body and text.strip() in body:
@@ -29,7 +31,7 @@ def add(night: str, text: str, by: str = "nightshift", path: Path = LESSONS) -> 
     return True
 
 
-def learn(night: str, summary: dict, path: Path = LESSONS) -> bool:
+def learn(night: str, summary: dict, path: Path | None = None) -> bool:
     """Write a lesson when the proof shows a case got worse or the verdict says don't approve."""
     worse = summary.get("worse") or []
     rejected = str(summary.get("verdict", "")).startswith("Don't approve")
