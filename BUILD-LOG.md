@@ -43,4 +43,14 @@ likely the gain is to be luck.
 (drunk caller) went 3/4 to 2/4, likely noise. Chance the overall gain is luck: about 5%. Simulator spend today:
 about $1.33.
 
-**Next.** Approve or not, then night 2 on the next five failures.
+**Approved** by me at 7:02pm (saved, not live; it needs a full run of every case first).
+
+**Night 2 (7:04pm), stacked on night 1's fix: rejected, correctly.** The agent took the next five failures (CO
+alarm, a cut hand, heavy swearing, a Mandarin speaker, a tenant asking who pays), found 4 causes, and flagged the
+Mandarin one as a conflict with an existing rule instead of forcing a fix. But on fresh calls it went 19/32 to
+20/32 (could easily be luck), and the cut-hand call dropped from 2/4 to 0/4: its new triage rule treated injuries
+as non-emergencies. So Nightshift now refuses any fix where one case drops by 2 or more, whatever the total says.
+That's the point of the proof step: the agent is good, not always right.
+
+**Next.** Full run of every case on night 1's fix (tomorrow, fresh $2 budget), then night 2 again with the
+cut-hand lesson in the instructions.
