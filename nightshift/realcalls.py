@@ -97,25 +97,41 @@ def full_transcripts(days: int) -> str:
         state = json.loads((DF / "demo_line" / "state.json").read_text())
         env = dict(ln.split("=", 1) for ln in (DF / ".env").read_text().splitlines() if "=" in ln and not ln.startswith("#"))
         key = env.get("VOICE_PLATFORM_API_KEY", "").strip().strip('"').strip("'")
-        calls = vapi_import._get("/call", key, {"assistantId": state["assistant_id"], "limit": 100})
-        return "\n\n".join(vapi_import.transcript(c, "Agent") for c in calls)
+        from datetime import datetime, timedelta, timezone
+        since = (datetime.now(timezone.utc) - timedelta(days=days + 1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        calls = vapi_import._get("/call", key, {"assistantId": state["assistant_id"], "limit": 100,
+                                                "createdAtGt": since})
+        parts = [f"## Call {c.get('id', '')[:8]} ({c.get('createdAt', '')[:16]} UTC)\n\n"
+                 + vapi_import.transcript(c, "Godfrey") for c in calls]
+        return "\n\n".join(p for p in parts if p.count("\n") >= 4)
     except Exception:  # noqa: BLE001 - best effort: the excerpt-only redaction still runs
         return ""
 
 
-def redact(text: str, context: str = "") -> str:
-    """demo-factory's redactor, with 911 protected (it reads "call 911" as an address) and names learned from context."""
+def redact_both(text: str, context: str = "") -> tuple[str, str]:
+    """demo-factory's redactor over context + text in one pass, so names learned in the full calls ("this is X") are
+    also removed from the report's excerpts. 911 is protected (the redactor reads "call 911" as an address).
+    Returns (redacted text, redacted context)."""
     guarded = NINE11.sub("NINEONEONEX", (context + SEP if context else "") + text)
-    out = _run(["-m", "demo_line.redact", "--keep-demo"], stdin=guarded)
-    out = out.split("=====NIGHTSHIFT-REPORT-STARTS=====", 1)[-1].lstrip("\n") if context else out
-    return out.replace("NINEONEONEX", "911")
+    out = _run(["-m", "demo_line.redact", "--keep-demo"], stdin=guarded).replace("NINEONEONEX", "911")
+    if not context:
+        return out, ""
+    ctx, _, rest = out.partition("=====NIGHTSHIFT-REPORT-STARTS=====")
+    return rest.lstrip("\n"), ctx.strip()
+
+
+def redact(text: str, context: str = "") -> str:
+    return redact_both(text, context)[0]
 
 
 def load(days: int, limit: int, report_file: Path | None = None) -> RealNight:
     raw = report_file.read_text() if report_file else _run(["-m", "demo_line.real_call_qa", "--days", str(days), "--stdout"])
-    redacted = redact(raw, "" if report_file else full_transcripts(days))
+    redacted, full = redact_both(raw, "" if report_file else full_transcripts(days))
     calls, flagged, counts = parse(raw)
-    head = ("# Flagged REAL calls (not simulated)\n\nThese are real calls to the demo line, flagged by heuristics on "
-            "the model's text, then redacted ([PHONE], [NAME], [ADDRESS]...). The calls may be older than the current "
-            "prompt, so a flag can already be fixed: check prompt.md before changing anything.\n\n")
-    return RealNight(head + redacted, calls, flagged, counts, twins(counts, limit))
+    head = ("# REAL calls to the demo line (not simulated)\n\nFirst, flags from automatic checks on the agent's text. "
+            "They're heuristics: some are wrong, and they miss things. Then the full calls: read each one yourself and "
+            "judge what went wrong, including problems no flag caught (for example asking the same question over and "
+            "over). Everything is redacted ([PHONE], [NAME], [ADDRESS]...). Calls may be older than the current prompt, "
+            "so check prompt.md before changing anything.\n\n")
+    tail = ("\n\n# Full calls (redacted)\n\n" + full) if full else ""
+    return RealNight(head + redacted + tail, calls, flagged, counts, twins(counts, limit))
