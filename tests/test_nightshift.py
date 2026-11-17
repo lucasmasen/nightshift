@@ -375,3 +375,20 @@ class OpsTests(unittest.TestCase):
         from nightshift import ops
         self.assertEqual(ops._clip("one two three four", 9), "one two…")
         self.assertEqual(ops._clip("short", 9), "short")
+
+
+class LessonTests(unittest.TestCase):
+    def test_learn_only_from_rejections_and_no_duplicates(self):
+        from nightshift import lessons
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "lessons.md"
+            ok = {"verdict": "Ready for approval", "worse": []}
+            self.assertFalse(lessons.learn("n1", ok, path=p))
+            bad = {"verdict": "Don't approve: cut_hand_medical dropped", "worse": ["cut_hand_medical"],
+                   "before": {"cases": {"cut_hand_medical": [2, 4]}}, "after": {"cases": {"cut_hand_medical": [0, 4]}},
+                   "agent_summary": {"summary": "excluded injuries from emergency triage"}}
+            self.assertTrue(lessons.learn("n2", bad, path=p))
+            self.assertFalse(lessons.learn("n2", bad, path=p))
+            text = p.read_text()
+            self.assertIn("cut_hand_medical (2/4 to 0/4)", text)
+            self.assertIn("excluded injuries", text)

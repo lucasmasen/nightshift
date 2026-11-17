@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import collect, config, cost, dashboard, export, fixer, guard, ops, realcalls, report, retest, stage, stats, video
+from . import collect, config, cost, dashboard, export, fixer, guard, lessons, ops, realcalls, report, retest, stage, stats, video
 from .hr import Client, HRError
 
 
@@ -257,6 +257,8 @@ def prove(summary: dict, cases: list[str], old: str, new: str, repeat: int) -> N
 
 
 def finish(out: Path, summary: dict) -> int:
+    if lessons.learn(out.name, summary):
+        log(f"Lesson saved to {lessons.LESSONS.name}: the next night's agent will read it.")
     (out / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
     (out / "report.html").write_text(report.render(summary))
     log(f"Verdict: {summary.get('verdict')}")
@@ -293,6 +295,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--by", default="lucas")
     ap.add_argument("--force", action="store_true")
     sub.add_parser("dashboard", help="Rebuild runs/index.html")
+    rj = sub.add_parser("reject", help="Human 'no': record why, so the next night's agent learns from it")
+    rj.add_argument("dir")
+    rj.add_argument("--why", required=True)
+    rj.add_argument("--by", default="lucas")
     rt = sub.add_parser("retest", help="Re-run the before/after proof for a night that already has a fix")
     rt.add_argument("dir")
     rt.add_argument("--repeat", type=int, default=4)
@@ -391,6 +397,11 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "stage":
         log(str(stage.write(Path(a.dir))))
         return 0
+    if a.cmd == "reject":
+        ok, msg = dashboard.reject(Path(a.dir), a.by, a.why)
+        log(msg)
+        dashboard.write()
+        return 0 if ok else 1
     if a.cmd == "dashboard":
         log(str(dashboard.write()))
         return 0

@@ -56,6 +56,19 @@ def approve(night_dir: Path, by: str, force: bool = False) -> tuple[bool, str]:
     return True, steps
 
 
+def reject(night_dir: Path, by: str, why: str) -> tuple[bool, str]:
+    """The human 'no'. Marks the night rejected and writes the reason into lessons.md for the next night's agent."""
+    from . import lessons
+    s = load(night_dir)
+    if s.get("approved"):
+        return False, "Already approved; nothing to reject."
+    s["rejected"] = {"by": by, "at": datetime.now().isoformat(timespec="seconds"), "why": why}
+    save(night_dir, s)
+    what = (s.get("agent_summary") or {}).get("summary") or "the proposed change"
+    lessons.add(night_dir.name, f"Rejected by a person ({by}): {why}\nThe change was: {what}", by=by)
+    return True, "Rejected. Reason saved to lessons.md; the next night's agent will read it."
+
+
 def nights() -> list[tuple[Path, dict]]:
     out = []
     for d in sorted(config.RUNS.glob("20*"), reverse=True):
@@ -86,7 +99,7 @@ def render() -> str:
         b, a = s.get("before"), s.get("after")
         base = f"{s.get('baseline_passed', 0)}/{s.get('baseline_total', 0)}"
         ba = f"{b['passed']}/{b['total']} &rarr; {a['passed']}/{a['total']}" if b and a else "-"
-        status = "approved" if s.get("approved") else ("ready" if str(s.get("verdict", "")).startswith("Ready") else "")
+        status = "approved" if s.get("approved") else "rejected" if s.get("rejected") else ("ready" if str(s.get("verdict", "")).startswith("Ready") else "")
         mock = " (mock)" if (s.get("trace") or {}).get("where") == "mock" else ""
         rows.append(f"<tr><td><a href='{html.escape(d.name)}/report.html'>{html.escape(d.name)}</a>{mock}</td><td>{base}</td>"
                     f"<td>{ba}</td><td class='{status}'>{status or '-'}</td><td>{html.escape(str(s.get('verdict', ''))[:120])}</td></tr>")

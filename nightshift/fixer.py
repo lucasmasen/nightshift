@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-from . import cost
+from . import cost, lessons
 from .hr import Client, final_text
 
 SYSTEM_PROMPT = """You are Nightshift. Each night you review an AI phone receptionist's calls and fix its instructions.
@@ -66,8 +66,13 @@ def run_harnessrouter(client: Client, prompt: Path, failures: Path, shop: Path, 
     harness_id = client.ensure_harness(SYSTEM_PROMPT)
     log(f"  harness: {harness_id}")
     ids = [client.upload(prompt, "prompt.md"), client.upload(failures, "failures.md"), client.upload(shop, "shop.json")]
-    log("  uploaded prompt.md, failures.md, shop.json")
-    started = client.start(harness_id, TASK, ids)
+    task = TASK
+    if lessons.LESSONS.exists():
+        ids.append(client.upload(lessons.LESSONS, "lessons.md"))
+        task += (" lessons.md lists earlier fixes that were rejected and what they broke: read it first and don't "
+                 "repeat those changes.")
+    log("  uploaded prompt.md, failures.md, shop.json" + (", lessons.md" if lessons.LESSONS.exists() else ""))
+    started = client.start(harness_id, task, ids)
     rid = started["id"]
     log(f"  task started: {rid} (this takes a few minutes)")
     done = client.wait(rid, on_tick=lambda r, s: log(f"  ...working ({s:.0f}s)") if s and s % 60 == 0 else None)
