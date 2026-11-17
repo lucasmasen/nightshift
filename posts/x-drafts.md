@@ -17,6 +17,16 @@ Use the community.harnessrouter.ai project page link once it exists; until then 
 > https://nightshift-bighack.vercel.app
 > #HarnessRouter #UHP #BigHackGame
 
+**1b. same story, stronger number (use this one; 276/280 with link)**
+Tue 11/17 verify: night 1's fix on every case, 140/178 to 153/178, ~5% chance it's luck. Bigger sample than
+the 1-of-4 to 4-of-4 case, which looks noisier than it did: today the unfixed prompt got 3 of 4 on that case.
+> my ai receptionist told a burst pipe caller "i'm letting the team know right now." the alert had failed. nobody was coming.
+>
+> nightshift fixes that overnight. on all 178 test calls: 79% passed before its fix, 86% after.
+>
+> https://nightshift-bighack.vercel.app
+> #HarnessRouter #UHP #BigHackGame
+
 ## Everyday posts (no tags; built to get replies)
 **2. polite failure (109)**
 > ai agents don't fail loudly. they fail politely.
