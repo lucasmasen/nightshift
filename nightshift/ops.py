@@ -21,12 +21,22 @@ CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 
 
 # ---- verify: the approved prompt on every case ------------------------------------------------------------------
+def baseline_path(s: dict) -> Path | None:
+    """The night's baseline run file. Older nights only saved its name, so look it up in the test checkout."""
+    if s.get("baseline_path"):
+        return Path(s["baseline_path"])
+    name = s.get("baseline_file") or ""
+    if not name.endswith(".md"):  # real-call nights store "real calls" here
+        return None
+    return config.TEST_CHECKOUT / "demo_line" / "suite_runs" / name
+
+
 def verify(night_dir: Path, log=print) -> dict:
     """Run every simulator case once with the night's proposed prompt and compare with the night's baseline run.
     About 178 calls (~$0.90): the step before anything goes live."""
     s = dashboard.load(night_dir)
-    base_path = Path(s.get("baseline_path") or "")
-    if not base_path.exists():
+    base_path = baseline_path(s)
+    if base_path is None or not base_path.is_file():
         raise RuntimeError("This night has no baseline run file to compare with (real-call nights don't).")
     base = collect.parse(base_path)
     log(f"Verify {night_dir.name}: every case once with the proposed prompt (about {base.total} calls)")

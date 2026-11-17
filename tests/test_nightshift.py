@@ -371,6 +371,15 @@ class OpsTests(unittest.TestCase):
             self.assertEqual(ops.golive(n, really=True, log=msgs.append), 1)
             self.assertIn("Not verified", msgs[-1])
 
+    def test_baseline_path_for_old_and_real_nights(self):
+        from nightshift import config, ops
+        # night 1 only saved the file name; an empty path used to resolve to "." and crash verify
+        self.assertEqual(ops.baseline_path({"baseline_file": "2026-11-16-173654.md"}),
+                         config.TEST_CHECKOUT / "demo_line" / "suite_runs" / "2026-11-16-173654.md")
+        self.assertIsNone(ops.baseline_path({"baseline_file": "real calls"}))
+        self.assertIsNone(ops.baseline_path({}))
+        self.assertEqual(ops.baseline_path({"baseline_path": "/x/y.md"}), Path("/x/y.md"))
+
     def test_clip(self):
         from nightshift import ops
         self.assertEqual(ops._clip("one two three four", 9), "one two…")
