@@ -61,3 +61,44 @@ cases that test the same behavior. Proof runs tomorrow.
 
 **Next.** Full run of every case on night 1's fix (tomorrow, fresh $2 budget), then night 2 again with the
 cut-hand lesson in the instructions.
+
+## Day 2: Tue 11/17
+
+**The scary number.** The morning's full check of night 1's fix (every test case, once each) came back **81 of
+178**. Before the fix it was 140. If that were true, the fix had nearly halved the score. It wasn't true: the wifi
+dropped mid-run, 83 calls crashed before the AI said a word, and Nightshift counted every crash as a failure.
+Of the 95 calls that actually ran, 81 passed (85%). So Nightshift now tells the two apart: a crashed call is set
+aside, never scored, and only the crashed calls are re-run (about $0.25 instead of $0.90 for all 178).
+
+**The real number.** With every call run: **140/178 before, 153/178 after (79% to 86%)**, about a 5% chance it's
+luck. That's the same odds as night 1's close-up, on more than 5x the calls, so it's now the headline.
+
+**What that check also showed.** 10 cases flipped from pass to fail, each on a single call. One call per case is
+noisy: on the same day, with no fix at all, the burst-pipe case scored 3 of 4, where night 1 had it at 1 of 4. So
+the 1-of-4 to 4-of-4 story I'd been telling was partly luck. Nightshift got a `recheck` command: re-run just the
+flipped cases 4 times, old prompt vs new, and label each "really worse" or "could be noise". That runs Wednesday.
+
+**Real-call fix: not proven.** 34 to 35 of 40 calls; about a 50% chance that's luck. It stays unapproved.
+
+**Any voice agent, not just mine.** Point Nightshift at a folder with an agent's instructions and its call
+transcripts. There's no grader for someone else's agent, so the HarnessRouter agent does the triage too: it reads
+every call, decides which went wrong and why, then fixes. I tested it on a made-up dental office with two planted
+mistakes: the AI promising "the dentist will call you back tonight" (nobody can be paged at night) and an
+ibuprofen dose. It found both, called the dose "invented, unsafe medical advice", added two lines, and judged the
+other three calls fine. Cost: about 9 cents. It can't prove the fix without a simulator, so the report says
+"proposed, not proven".
+
+**Try it page.** The local web app has a page where you paste any agent's prompt and calls and press Run. That's
+the Demo Day plan: offer to run it on a judge's own agent.
+
+**Smaller fixes.** The old night had saved its baseline under a different field, which crashed the morning script.
+Vercel's newer command line exits with an error after a good deploy, so Nightshift now checks for the "Aliased" line.
+The privacy scan read "this is invented" as a person's name and would have blocked the site, so example-agent nights
+stay off the public site unless published by hand. Claude Code vs Codex stopped at the $2 cap two-thirds done; it
+now saves after each run and finishes Wednesday instead of starting over.
+
+**Spend today:** about $1.99 of simulated calls (the cap) and about $0.10 of HarnessRouter agent time.
+**Tests:** 43, all passing.
+
+**Next (Wed).** Codex's half of the comparison, the re-check of the 10 flipped cases, then a fix for anything
+that's really worse.
