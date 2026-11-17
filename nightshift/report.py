@@ -66,6 +66,18 @@ def render(night: dict) -> str:
                            f"<th>Mistake came back, old instructions</th><th>New instructions</th></tr>{rows_r}</table>"
                            f"<div class='sub'>{html.escape(rp.get('verdict', ''))} Agent model: "
                            f"{html.escape(str(rp.get('agent_model', '')))}. {html.escape(rp.get('limit', ''))}</div></div>")
+    elif night.get("mode") == "real":
+        total = night.get("baseline_total", 0)
+        wrong = total - night.get("baseline_passed", 0)
+        twins = night.get("twin_tests") or []
+        intro = (f"{total} real call{'' if total == 1 else 's'} to the demo line; {wrong} went wrong. The fix agent read "
+                 "the whole calls (names, numbers and addresses scrubbed first), not just the automatic flags. "
+                 + (f"Each call that went wrong became a permanent test ({', '.join(twins)}): the caller's own words "
+                    "with made-up details, replayed first in the proof and kept for every future fix. " if twins else "")
+                 + "Real calls can't be replayed live, so the proof runs those tests plus related ones, before and after.")
+        retest_html = ('<h2>Every case it re-ran</h2><div class="card"><table><tr><th>Case</th><th>Why re-run</th>'
+                       '<th>Before</th><th>After</th></tr>' + ("".join(rows) or "<tr><td colspan=4>Not re-tested yet.</td></tr>")
+                       + "</table></div>")
     else:
         intro = (f"{night.get('baseline_passed', 0)} of {night.get('baseline_total', 0)} simulated calls passed overnight; "
                  f"{nfail} kind{'' if nfail == 1 else 's'} of call failed and got a fix. Nightshift proposed a fix and "

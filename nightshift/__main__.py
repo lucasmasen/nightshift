@@ -150,7 +150,7 @@ def night(args: argparse.Namespace) -> int:
 
     # 4. Prove it: the same cases, same number of fresh calls, before and after.
     if args.no_retest:
-        summary["verdict"] = "Fix proposed and passed the safety check (not re-tested: --no-retest)."
+        summary["verdict"] = "Fix proposed and passed the safety check. Not re-tested yet: the proof runs on the next test budget."
         return finish(out, summary)
     cases = failed + pick_guard_cases(base, failed, args.guards)
     try:
@@ -217,7 +217,7 @@ def real_night(args: argparse.Namespace, out: Path, stamp: str) -> int:
                                                             if g not in targets]
     summary["retest_cases"] = cases
     if args.no_retest:
-        summary["verdict"] = "Fix proposed and passed the safety check (not re-tested: --no-retest)."
+        summary["verdict"] = "Fix proposed and passed the safety check. Not re-tested yet: the proof runs on the next test budget."
         return finish(out, summary)
     try:
         prove(summary, cases, old, fix.prompt, args.repeat)
