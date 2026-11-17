@@ -29,10 +29,12 @@ re-runs the failed calls plus calls that already worked, before and after, and l
 score, the exact change and the reasoning. Nothing goes live until a person approves it. Built on my after-hours
 receptionist for plumbers (demo shop: Sunset Plumbing, made up). For anyone running a voice agent.
 
-**Live link or GitHub:** TBD. Options: (a) public GitHub repo of `nightshift/` (Lucas's call: it's public; the
-Godfrey prompt is git-ignored and never in it), or (b) the dashboard page hosted as a static site.
+**Live link or GitHub:** https://nightshift-bighack.vercel.app (published 11/16 ~7:35pm on Lucas's Vercel team
+"kakhao", project `nightshift-bighack`; public; to update: `python3 -m nightshift export <nights...>` then redeploy
+the site folder with `vercel deploy --prod`).
 
-**Demo video:** TBD, record Wed night (60-90 s: the failing call, the overnight fix, the before/after score, approve).
+**Demo video:** auto-built silent captioned cut: https://nightshift-bighack.vercel.app/2026-11-16-184822/demo.mp4
+(50 s). Better: upload to YouTube as Unlisted (with Lucas's voiceover) and use that link.
 
 **Harness ID:** `chrn_2714f128e6d744ad8c8fe0fd4844c88e` (Nightshift, claude-code). If a Codex harness is added
 for the side-by-side, add its ID as a second line.
