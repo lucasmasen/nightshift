@@ -55,6 +55,33 @@ def problems(text: str) -> list[str]:
     return out
 
 
+def real_call_story() -> str:
+    """The newest real-call night with a fix, told in a few public-safe lines: counts, the agent's summary, the
+    permanent test, and the proof once it has run. No transcript text leaves the Mac."""
+    import html
+    import json
+    for d in sorted(config.RUNS.glob("20*"), reverse=True):
+        f = d / "summary.json"
+        if not f.exists():
+            continue
+        s = json.loads(f.read_text())
+        if s.get("mode") != "real" or not s.get("diff"):
+            continue
+        total, wrong = s.get("baseline_total", 0), s.get("baseline_total", 0) - s.get("baseline_passed", 0)
+        what = (s.get("agent_summary") or {}).get("summary", "")
+        b, a = s.get("before") or {}, s.get("after") or {}
+        proof = (f"Proof on fresh test calls: {b['passed']}/{b['total']} before, {a['passed']}/{a['total']} after."
+                 if a else "Proof: not run yet (it runs on the next day's test budget).")
+        twins = s.get("twin_tests") or []
+        return (f"<h2 style='margin-top:34px'>A real person called it</h2><p>{total} real call"
+                f"{'' if total == 1 else 's'} to the demo line, {wrong} went wrong. The fix agent read the whole call, names and "
+                f"numbers scrubbed first. What it changed: {html.escape(what)}</p><p>"
+                + (f"The call became a permanent test ({html.escape(', '.join(twins))}): the caller's own words with "
+                   "made-up details, re-run against every future fix. " if twins else "")
+                + f"{proof} Nothing went live.</p>")
+    return ""
+
+
 def landing(nights: list[str]) -> str:
     """The front page: what Nightshift is, the best night's numbers, and links to its stage view, report and video."""
     import html
@@ -109,6 +136,7 @@ main{{max-width:860px;margin:0 auto;padding:64px 16px}} h1{{font-size:clamp(40px
 With no grader for someone else's agent, the HarnessRouter agent does the triage too: it reads every call, decides
 which went wrong and why, then makes the fix. On a made-up dental office's AI it caught both planted mistakes (a
 "the dentist will call you back tonight" nobody could keep, and a medicine dose) for about 9 cents.</p>
+{real_call_story()}
 <h2 style="margin-top:34px">What's real, and what isn't yet</h2>
 <ul>
 <li><b>Real:</b> the fixes. A Claude Code agent on HarnessRouter wrote every change shown here; nothing was hand-edited.</li>
@@ -116,7 +144,7 @@ which went wrong and why, then makes the fix. On a made-up dental office's AI it
 graded by code checks and a judge model), not people on phones.</li>
 <li><b>Real:</b> the safety check, the luck estimate, and the Approve button. Nothing has gone live on the phone line.</li>
 <li><b>New, not yet proven:</b> real calls. Nightshift reads the demo line's real calls (names and numbers scrubbed),
-but so far only a handful exist, all made by me.</li>
+but so far only a handful exist, made by me and by friends trying to break it.</li>
 <li><b>New, not yet proven:</b> running by itself. The 2am schedule was switched on Nov 17; the first unattended
 nights are Nov 18 to 20.</li>
 <li><b>Not yet:</b> anyone else's agent in production. The any-agent mode was tested on a made-up dental office.</li>

@@ -691,6 +691,29 @@ class PreflightTests(unittest.TestCase):
                 preflight.OFFLINE = old
 
 
+class HomepageRealCallTests(unittest.TestCase):
+    def test_story_uses_counts_not_transcripts(self):
+        from nightshift import config, export
+        with tempfile.TemporaryDirectory() as d:
+            old = config.RUNS
+            config.RUNS = Path(d)
+            try:
+                n = Path(d) / "2026-11-18-020000"
+                n.mkdir()
+                (n / "summary.json").write_text(json.dumps({
+                    "mode": "real", "diff": "+x", "baseline_total": 2, "baseline_passed": 1,
+                    "agent_summary": {"summary": "stopped <the> loop"}, "twin_tests": ["real_x"],
+                    "agent_report": "Caller: my name is SECRET", "before": {"passed": 3, "total": 8},
+                    "after": {"passed": 7, "total": 8}}))
+                html_out = export.real_call_story()
+            finally:
+                config.RUNS = old
+        self.assertIn("2 real calls to the demo line, 1 went wrong", html_out)
+        self.assertIn("stopped &lt;the&gt; loop", html_out)
+        self.assertIn("3/8 before, 7/8 after", html_out)
+        self.assertNotIn("SECRET", html_out)
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve
