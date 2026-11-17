@@ -46,6 +46,7 @@ class RealNight:
     flag_counts: dict[str, int]
     cases: list[str]  # simulator twins, most-flagged first
     ids: list[str] = None  # the calls reviewed (short ids), so later nights can skip them
+    full: str = ""  # the redacted full calls ("## Call <id> ..."), for building their twin tests
 
 
 def _run(args: list[str], stdin: str | None = None) -> str:
@@ -158,4 +159,4 @@ def load(days: int, limit: int, report_file: Path | None = None, skip_seen: bool
             "so check prompt.md before changing anything.\n\n")
     tail = ("\n\n# Full calls (redacted)\n\n" + full) if full else ""
     ids = [m.group(2)[:8] for m in CALL.finditer(raw)]
-    return RealNight(head + redacted + tail, calls, flagged, counts, twins(counts, limit), ids)
+    return RealNight(head + redacted + tail, calls, flagged, counts, twins(counts, limit), ids, full)

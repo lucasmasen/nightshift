@@ -206,7 +206,15 @@ def real_night(args: argparse.Namespace, out: Path, stamp: str) -> int:
     targets = realcalls.twins({f: 1 for f in fixed}, max(1, args.max_cases)) if fixed else rn.cases
     summary.update(fixed_flags=fixed, failed_cases=targets)
     log(f"   agent fixed: {', '.join(fixed) or '(not stated)'}; proving on: {', '.join(targets)}")
-    cases = targets + [g for g in DEFAULT_GUARDS[:max(0, args.guards)] if g not in targets]
+    # Each flagged real call also becomes a permanent test, replayed first in the proof.
+    from . import twins as twin_tests
+    flagged_ids = [i for i in (rn.ids or [])]
+    made = twin_tests.from_night(rn.full, fix.report, flagged_ids, stamp[:10]) if rn.full else []
+    if made:
+        log(f"   new permanent test(s) from the real calls: {', '.join(made)}")
+    summary["twin_tests"] = made
+    cases = made + [c for c in targets if c not in made] + [g for g in DEFAULT_GUARDS[:max(0, args.guards)]
+                                                            if g not in targets]
     summary["retest_cases"] = cases
     if args.no_retest:
         summary["verdict"] = "Fix proposed and passed the safety check (not re-tested: --no-retest)."

@@ -590,6 +590,34 @@ class SeenCallsTests(unittest.TestCase):
         self.assertEqual(realcalls.drop_calls(rep, set()), rep)
 
 
+class TwinTests(unittest.TestCase):
+    def test_twin_from_real_call(self):
+        from nightshift import twins
+        full = ("## Call abc12345 (2026-11-17T21:55 UTC)\n\nGodfrey: Hi, I'm an AI, this call is recorded.\n"
+                "Caller: I smell gas. This is [NAME].\n[alert_on_call_plumber: {\"kind\": \"gas\"}]\n"
+                "Godfrey: Get out now.\nCaller: We're out. Call me at [PHONE].\nCaller: \nGodfrey: Bye now.\n")
+        report = ("# Nightshift report\nabc12345 overview\n## Cause 1: bye now too early\n- Failed case: abc12345\n"
+                  "- Bad moment: Godfrey: \"Bye now.\" to [NAME]\n## Cause 2: other call\n- Failed case: zzz\n")
+        name, case = twins.build("abc12345", twins.by_call(full)["abc12345"], report, "2026-11-17")
+        self.assertEqual(name, "real_20261117_abc123")
+        self.assertEqual(case["lines"], ["I smell gas. This is Sam.", "We're out. Call me at 415 555 0123."])
+        self.assertEqual(case["expect"], ["alert", "gas_safety"])
+        self.assertIn("bye now too early", case["judge"])
+        self.assertNotIn("other call", case["judge"])
+        self.assertNotIn("[NAME]", case["judge"])
+        self.assertNotIn("Nightshift report", case["judge"])
+
+    def test_save_merges_without_overwriting(self):
+        from nightshift import twins
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "suite_extra.json"
+            self.assertEqual(twins.save({"a": {"lines": ["x"]}}, f), ["a"])
+            self.assertEqual(twins.save({"a": {"lines": ["changed"]}, "b": {"lines": ["y"]}}, f), ["b"])
+            data = json.loads(f.read_text())
+            self.assertEqual(data["a"]["lines"], ["x"])
+            self.assertIn("b", data)
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve
