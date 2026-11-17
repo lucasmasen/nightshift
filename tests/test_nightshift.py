@@ -371,6 +371,20 @@ class OpsTests(unittest.TestCase):
             self.assertEqual(ops.golive(n, really=True, log=msgs.append), 1)
             self.assertIn("Not verified", msgs[-1])
 
+    def test_crashed_calls_are_not_failures(self):
+        # 11/17: the wifi dropped mid-verify and 83 crashed calls were scored as fails (140/178 -> "81/178")
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "run.md"
+            f.write_text("**1 of 3 passed.**\n\n| Case | Result | Notes |\n|---|---|---|\n"
+                         "| a | PASS | fine |\n| b | FAIL | two questions in one turn |\n"
+                         "| c | FAIL | simulator failed: ^^^^^^\n    raise APIConnectionError(request=request) from err\n"
+                         "anthropic.APIConnectionError: Connection error.\n; judge:  |\n\n## Transcripts\n")
+            run = collect.parse(f)
+            self.assertEqual((run.passed, run.total), (1, 2))
+            self.assertEqual([c.case for c in run.failures], ["b"])
+            self.assertEqual([c.case for c in run.crashed], ["c"])
+            self.assertNotIn("c", run.case_scores())
+
     def test_baseline_path_for_old_and_real_nights(self):
         from nightshift import config, ops
         # night 1 only saved the file name; an empty path used to resolve to "." and crash verify

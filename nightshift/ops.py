@@ -31,30 +31,56 @@ def baseline_path(s: dict) -> Path | None:
     return config.TEST_CHECKOUT / "demo_line" / "suite_runs" / name
 
 
-def verify(night_dir: Path, log=print) -> dict:
+def verify(night_dir: Path, log=print, reuse: Path | None = None, crash_retries: int = 2) -> dict:
     """Run every simulator case once with the night's proposed prompt and compare with the night's baseline run.
-    About 178 calls (~$0.90): the step before anything goes live."""
+    About 178 calls (~$0.90): the step before anything goes live.
+
+    Calls where the simulator itself crashed (network drop, API error) say nothing about the fix, so they're re-run,
+    up to crash_retries times. `reuse` starts from a run file that already happened and only re-runs its crashes."""
     s = dashboard.load(night_dir)
     base_path = baseline_path(s)
     if base_path is None or not base_path.is_file():
         raise RuntimeError("This night has no baseline run file to compare with (real-call nights don't).")
     base = collect.parse(base_path)
-    log(f"Verify {night_dir.name}: every case once with the proposed prompt (about {base.total} calls)")
-    r = retest.run_suite([], (night_dir / "prompt.proposed.md").read_text(), repeat=1, log=log, fresh=True)
-    after = r.run
-    bc, ac = base.case_scores(), after.case_scores()
+    proposed = (night_dir / "prompt.proposed.md").read_text()
+    spent = 0.0
+    if reuse:
+        after = collect.parse(reuse)
+        log(f"Verify {night_dir.name}: reusing {reuse.name} ({after.total} calls ran, {len(after.crashed)} crashed)")
+    else:
+        log(f"Verify {night_dir.name}: every case once with the proposed prompt (about {base.total} calls)")
+        r = retest.run_suite([], proposed, repeat=1, log=log, fresh=True)
+        after, spent = r.run, spent + (cost.sim_cost(r.output) or 0.0)
+    files = [after.path.name]
+    calls = [c for c in after.calls if not c.crashed]
+    todo = [c.case for c in after.crashed]
+    for attempt in range(crash_retries):
+        if not todo:
+            break
+        log(f"{len(todo)} calls crashed in the simulator (not the agent); re-running just those ({attempt + 1}/{crash_retries})")
+        r = retest.run_suite(todo, proposed, repeat=1, log=log, fresh=True)
+        spent += cost.sim_cost(r.output) or 0.0
+        files.append(r.run.path.name)
+        calls += [c for c in r.run.calls if not c.crashed]
+        todo = [c.case for c in r.run.crashed]
+    merged = collect.Run(path=after.path, passed=sum(c.passed for c in calls), total=len(calls), calls=calls)
+    bc, ac = base.case_scores(), merged.case_scores()
     newly_failing = sorted(c for c, (p, t) in ac.items() if p < t and bc.get(c, (0, 0))[0] == bc.get(c, (0, 1))[1])
     newly_passing = sorted(c for c, (p, t) in ac.items() if p == t and bc.get(c, (1, 1))[0] < bc.get(c, (1, 1))[1])
-    result = {"baseline": f"{base.passed}/{base.total}", "with_fix": f"{after.passed}/{after.total}",
-              "baseline_rate": round(base.score, 3), "with_fix_rate": round(after.score, 3),
-              "newly_failing": newly_failing, "newly_passing": newly_passing, "file": after.path.name,
-              "cost_usd": cost.sim_cost(r.output)}
-    # Single calls are noisy: a case flipping once is a hint, not a verdict. Go-live needs the rate not to drop.
-    result["ok_to_go_live"] = after.score >= base.score
+    result = {"baseline": f"{base.passed}/{base.total}", "with_fix": f"{merged.passed}/{merged.total}",
+              "baseline_rate": round(base.score, 3), "with_fix_rate": round(merged.score, 3),
+              "newly_failing": newly_failing, "newly_passing": newly_passing, "file": files[0], "files": files,
+              "still_crashed": todo, "cost_usd": round(spent, 3)}
+    # Single calls are noisy: a case flipping once is a hint, not a verdict. Go-live needs the rate not to drop,
+    # and nearly every case to have actually run.
+    complete = merged.total >= 0.95 * base.total
+    result["complete"] = complete
+    result["ok_to_go_live"] = complete and merged.score >= base.score
     s["verify"] = result
     dashboard.save(night_dir, s)
     log(f"Baseline {result['baseline']} -> with fix {result['with_fix']}; newly failing: "
-        f"{', '.join(newly_failing) or 'none'}; ok to go live: {result['ok_to_go_live']}")
+        f"{', '.join(newly_failing) or 'none'}"
+        + ("" if complete else f"; INCOMPLETE: {len(todo)} calls never ran") + f"; ok to go live: {result['ok_to_go_live']}")
     return result
 
 

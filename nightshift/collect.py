@@ -11,6 +11,8 @@ from pathlib import Path
 
 HEADLINE = re.compile(r"\*\*(\d+) of (\d+) passed\.\*\*")
 ROW = re.compile(r"^\| ([a-z0-9_]+)(?: \(reused\))? \| (PASS|FAIL)[^|]* \| (.*) \|\s*$")
+# A crashed call's notes hold a multi-line traceback, so its table row doesn't end on the same line.
+CRASH = re.compile(r"^\| ([a-z0-9_]+)(?: \(reused\))? \| FAIL[^|]* \| (simulator failed.*)$")
 BLOCK = re.compile(r"^### ([a-z0-9_]+) \((PASS|FAIL)[^)]*\)\s*$")
 
 
@@ -20,6 +22,11 @@ class Call:
     passed: bool
     notes: str
     transcript: str = ""
+
+    @property
+    def crashed(self) -> bool:
+        """The simulator itself failed (network drop, API error): no verdict on the agent either way."""
+        return self.notes.startswith("simulator failed")
 
 
 @dataclass
@@ -31,7 +38,11 @@ class Run:
 
     @property
     def failures(self) -> list[Call]:
-        return [c for c in self.calls if not c.passed]
+        return [c for c in self.calls if not c.passed and not c.crashed]
+
+    @property
+    def crashed(self) -> list[Call]:
+        return [c for c in self.calls if c.crashed]
 
     @property
     def score(self) -> float:
@@ -41,6 +52,8 @@ class Run:
         """case -> (passed, total)."""
         out: dict[str, tuple[int, int]] = {}
         for c in self.calls:
+            if c.crashed:
+                continue
             p, t = out.get(c.case, (0, 0))
             out[c.case] = (p + int(c.passed), t + 1)
         return out
@@ -55,6 +68,10 @@ def parse(path: Path) -> Run:
         r = ROW.match(line)
         if r:
             calls.append(Call(case=r.group(1), passed=r.group(2) == "PASS", notes=r.group(3).strip()))
+            continue
+        k = CRASH.match(line)
+        if k:
+            calls.append(Call(case=k.group(1), passed=False, notes=k.group(2).strip()))
     # Transcript blocks line up with table rows in order; match them case by case.
     blocks: list[tuple[str, bool, list[str]]] = []
     for line in transcripts.splitlines():
@@ -73,6 +90,9 @@ def parse(path: Path) -> Run:
     _fill_reused(Path(path), calls)
     passed = int(m.group(1)) if m else sum(c.passed for c in calls)
     total = int(m.group(2)) if m else len(calls)
+    if any(c.crashed for c in calls):  # score only the calls that actually ran
+        ran = [c for c in calls if not c.crashed]
+        passed, total = sum(c.passed for c in ran), len(ran)
     return Run(path=Path(path), passed=passed, total=total, calls=calls)
 
 

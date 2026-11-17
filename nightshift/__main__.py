@@ -309,6 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     ex.add_argument("nights", nargs="+")
     vf = sub.add_parser("verify", help="Run every case once with a night's fix and compare with its baseline (~$0.90)")
     vf.add_argument("dir")
+    vf.add_argument("--reuse", help="a suite run file that already ran; only its crashed calls are re-run")
     sub.add_parser("publish", help="Export every real night and deploy the public site (Vercel)")
     cd = sub.add_parser("card", help="1080x1350 post image for a night")
     cd.add_argument("dir")
@@ -369,7 +370,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if not issues else 1
     if a.cmd == "verify":
         try:
-            ok = ops.verify(Path(a.dir), log=log)["ok_to_go_live"]
+            ok = ops.verify(Path(a.dir), log=log, reuse=Path(a.reuse) if a.reuse else None)["ok_to_go_live"]
         except retest.Refused as e:
             log(f"Refused by the $2/day cap: {e}")
             return 1
