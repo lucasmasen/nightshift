@@ -714,6 +714,34 @@ class HomepageRealCallTests(unittest.TestCase):
         self.assertNotIn("SECRET", html_out)
 
 
+class AgentRegistryTests(unittest.TestCase):
+    def test_register_and_folder_only_runs_when_new(self):
+        import time
+        from nightshift import agents
+        with tempfile.TemporaryDirectory() as d:
+            old = agents.DIR
+            agents.DIR = Path(d) / "agents"
+            try:
+                folder = Path(d) / "acme"
+                (folder / "calls").mkdir(parents=True)
+                (folder / "prompt.md").write_text("p")
+                (folder / "calls" / "1.txt").write_text("Agent: hi\nCaller: hey\n")
+                agents.register("acme", folder=str(folder))
+                with self.assertRaises(ValueError):
+                    agents.register("x", vapi="a", key_env="sk-live-123")
+                with self.assertRaises(ValueError):
+                    agents.register("Bad Name", folder=str(folder))
+                self.assertIn("acme", agents.registered())
+                entry = agents.registered()["acme"]
+                self.assertEqual(agents.prepare("acme", entry, log=lambda m: None), folder.resolve())
+                self.assertIsNone(agents.prepare("acme", entry, log=lambda m: None))  # nothing new
+                time.sleep(0.05)
+                (folder / "calls" / "2.txt").write_text("Agent: hi\nCaller: again\n")
+                self.assertEqual(agents.prepare("acme", entry, log=lambda m: None), folder.resolve())
+            finally:
+                agents.DIR = old
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

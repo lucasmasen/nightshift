@@ -79,6 +79,16 @@ def run(real_days: int = 1, max_cases: int = 4, send_email: bool = True, log=pri
     code, out, night = _run(args, log)
     items.append(_item("Simulated calls" + (f" (building on approved {base.name})" if base else ""), code, out, night))
 
+    from . import agents
+    for name, entry in agents.registered().items():
+        folder = agents.prepare(name, entry, log=log)
+        if folder is None:
+            items.append({"title": f"{name} (other agent)", "night": None, "summary": None,
+                          "note": "No new calls since yesterday, or no key."})
+            continue
+        code, out, night = _run(["agent", str(folder)], log)
+        items.append(_item(f"{name} (other agent)", code, out, night))
+
     ensure_server(log=log)
     if send_email:
         subject, text, body = mail.render(items, date)

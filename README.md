@@ -48,6 +48,12 @@ ones, graded on what went wrong last time. It's saved to the test copy's `demo_l
 first in the proof, then kept forever, so the same mistake can't quietly come back. Nightly runs skip calls an
 earlier night already reviewed.
 
+## Other people's agents, every night
+`python3 -m nightshift register-agent acme --vapi <assistant id> --key-env ACME_VAPI_KEY` (their key goes in .env
+under that name; the entry only stores the name). Every night the 2am run pulls that agent's calls from the last day
+(read-only, redacted), runs the any-agent review on them, and adds the result to the morning email. A folder agent
+(`--folder`) only runs when its folder has new calls.
+
 ## Any voice agent, not just Godfrey
 Point `agent` at a folder with `prompt.md` and `calls/*.txt` (or `calls.jsonl`), plus optional `facts.md` and
 `protect.txt` (lines that must never change). There's no grader for someone else's agent, so the HarnessRouter agent
