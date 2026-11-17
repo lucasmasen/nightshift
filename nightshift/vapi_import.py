@@ -53,12 +53,13 @@ def system_prompt(assistant: dict) -> str:
 
 
 def redact(text: str) -> str:
+    from .realcalls import NINE11
     py = config.WORKSPACE / "demo-factory" / ".venv" / "bin" / "python"
-    p = subprocess.run([str(py), "-m", "demo_line.redact"], cwd=config.WORKSPACE / "demo-factory", input=text,
-                       capture_output=True, text=True, timeout=300)
+    p = subprocess.run([str(py), "-m", "demo_line.redact"], cwd=config.WORKSPACE / "demo-factory",
+                       input=NINE11.sub("NINEONEONEX", text), capture_output=True, text=True, timeout=300)
     if p.returncode not in (0, 1) or not p.stdout.strip():
         raise RuntimeError("redaction failed; not writing unredacted calls")
-    return p.stdout
+    return p.stdout.replace("NINEONEONEX", "911")
 
 
 def run(assistant_id: str, out: Path, days: int = 7, limit: int = 50, key: str | None = None, log=print) -> Path:

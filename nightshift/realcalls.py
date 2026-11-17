@@ -9,6 +9,7 @@ test the same behavior as each flag.
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from dataclasses import dataclass
@@ -84,9 +85,35 @@ def fixed_flags(agent_report: str) -> list[str]:
     return [f for f in dict.fromkeys(re.findall(r"`([a-z_]+)`", head)) if f in FLAG_TO_CASES]
 
 
+NINE11 = re.compile(r"\b9[\s-]?1[\s-]?1\b|\bnine[\s-]one[\s-]one\b", re.I)
+SEP = "\n\n=====NIGHTSHIFT-REPORT-STARTS=====\n\n"
+
+
+def full_transcripts(days: int) -> str:
+    """The window's whole calls, so the redactor learns every name a caller gave ("this is X") before it cleans the
+    report's short excerpts, where a name can appear with nothing marking it as one. Read-only; empty if it can't."""
+    try:
+        from . import vapi_import
+        state = json.loads((DF / "demo_line" / "state.json").read_text())
+        env = dict(ln.split("=", 1) for ln in (DF / ".env").read_text().splitlines() if "=" in ln and not ln.startswith("#"))
+        key = env.get("VOICE_PLATFORM_API_KEY", "").strip().strip('"').strip("'")
+        calls = vapi_import._get("/call", key, {"assistantId": state["assistant_id"], "limit": 100})
+        return "\n\n".join(vapi_import.transcript(c, "Agent") for c in calls)
+    except Exception:  # noqa: BLE001 - best effort: the excerpt-only redaction still runs
+        return ""
+
+
+def redact(text: str, context: str = "") -> str:
+    """demo-factory's redactor, with 911 protected (it reads "call 911" as an address) and names learned from context."""
+    guarded = NINE11.sub("NINEONEONEX", (context + SEP if context else "") + text)
+    out = _run(["-m", "demo_line.redact", "--keep-demo"], stdin=guarded)
+    out = out.split("=====NIGHTSHIFT-REPORT-STARTS=====", 1)[-1].lstrip("\n") if context else out
+    return out.replace("NINEONEONEX", "911")
+
+
 def load(days: int, limit: int, report_file: Path | None = None) -> RealNight:
     raw = report_file.read_text() if report_file else _run(["-m", "demo_line.real_call_qa", "--days", str(days), "--stdout"])
-    redacted = _run(["-m", "demo_line.redact", "--keep-demo"], stdin=raw)
+    redacted = redact(raw, "" if report_file else full_transcripts(days))
     calls, flagged, counts = parse(raw)
     head = ("# Flagged REAL calls (not simulated)\n\nThese are real calls to the demo line, flagged by heuristics on "
             "the model's text, then redacted ([PHONE], [NAME], [ADDRESS]...). The calls may be older than the current "
