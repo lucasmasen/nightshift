@@ -296,3 +296,11 @@ class ReviewFixTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             run = collect.parse(write(Path(d), "r.md", RUN))
         self.assertEqual(pick_guard_cases(run, ["book_earliest"], 0), [])
+
+
+class BigDropTests(unittest.TestCase):
+    def test_big_drop_blocks_approval(self):
+        from nightshift.__main__ import verdict
+        s = {"before": {"passed": 19, "total": 32, "cases": {"cut_hand_medical": [2, 4], "co_alarm": [0, 4]}},
+             "after": {"passed": 26, "total": 32, "cases": {"cut_hand_medical": [0, 4], "co_alarm": [4, 4]}}}
+        self.assertTrue(verdict(s).startswith("Don't approve: cut_hand_medical"))
