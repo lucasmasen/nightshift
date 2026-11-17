@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import collect, config, dashboard, fixer, guard, report, retest, stage
+from . import collect, config, dashboard, fixer, guard, report, export, retest, stage, stats
 from .hr import Client, HRError
 
 
@@ -137,6 +137,21 @@ def night(args: argparse.Namespace) -> int:
     return finish(out, summary)
 
 
+def verdict(summary: dict) -> str:
+    """Ready only when the gain is unlikely to be luck (one-sided Fisher p < 0.2) and no passing case got worse."""
+    b, a = summary["before"], summary["after"]
+    p = stats.fisher_improved(b["passed"], b["total"], a["passed"], a["total"])
+    summary["p_value"], summary["evidence"] = round(p, 3), stats.strength(p)
+    gain, worse, broke = a["passed"] - b["passed"], summary.get("worse", []), summary.get("broke", [])
+    tail = f" Evidence: {summary['evidence']} (p={p:.2f})." + (f" Slightly worse on {', '.join(worse)}." if worse else "")
+    if gain > 0 and p < 0.2 and not broke:
+        return f"Ready for approval: {b['passed']}/{b['total']} to {a['passed']}/{a['total']} on fresh re-runs." + tail
+    if gain > 0:
+        why = f"it made {', '.join(broke)} worse" if broke else "the gain could be luck at this sample size"
+        return f"Better ({b['passed']} to {a['passed']} of {a['total']}), but {why}. Review before approving." + tail
+    return f"Not better on fresh re-runs ({b['passed']} to {a['passed']} of {a['total']}). Don't approve." + tail
+
+
 def prove(summary: dict, cases: list[str], old: str, new: str, repeat: int) -> None:
     """Fresh calls, same cases, same count, before and after; sets before/after/broke/verdict on summary."""
     failed = summary.get("failed_cases", [])
@@ -148,15 +163,7 @@ def prove(summary: dict, cases: list[str], old: str, new: str, repeat: int) -> N
     worse = [c for c in cases if ac.get(c, (0, 1))[0] < bc.get(c, (0, 0))[0]]
     summary["broke"] = [c for c in worse if c not in failed]
     summary["worse"] = worse
-    gain = after.passed - before.passed
-    if gain >= 2 and not summary["broke"]:
-        v = f"Ready for approval: {before.passed}/{before.total} to {after.passed}/{after.total} on fresh re-runs."
-    elif gain > 0:
-        v = (f"Slightly better ({before.passed} to {after.passed} of {after.total}), too small to trust at this "
-             f"sample size" + (f"; worse on {', '.join(worse)}" if worse else "") + ". Review before approving.")
-    else:
-        v = f"Not better on fresh re-runs ({before.passed} to {after.passed} of {after.total}). Don't approve."
-    summary["verdict"] = v
+    summary["verdict"] = verdict(summary)
 
 
 def finish(out: Path, summary: dict) -> int:
@@ -197,6 +204,8 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("dir")
     rt.add_argument("--repeat", type=int, default=4)
     rt.add_argument("--guards", type=int, default=3)
+    ex = sub.add_parser("export", help="Build site/ (public static copy) from the named nights; never deploys")
+    ex.add_argument("nights", nargs="+")
     st = sub.add_parser("stage", help="Build the 6-slide demo view for one night")
     st.add_argument("dir")
     r = sub.add_parser("report")
@@ -234,6 +243,10 @@ def main(argv: list[str] | None = None) -> int:
         except retest.Refused as e:
             summ["verdict"] = f"Re-test refused by the $2/day simulator cap: {e}"
         return finish(d, summ)
+    if a.cmd == "export":
+        site, issues = export.build(a.nights)
+        log(f"Built {site}" + ("" if not issues else "\nHeld back (fix before publishing):\n  " + "\n  ".join(issues)))
+        return 0 if not issues else 1
     if a.cmd == "stage":
         log(str(stage.write(Path(a.dir))))
         return 0

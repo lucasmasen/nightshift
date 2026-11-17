@@ -13,8 +13,9 @@ harness reads the failed calls and edits the agent's prompt as a background task
    The agent finds the cause of each failure, makes the smallest edit to the prompt, and writes a report.
 3. **Safety check.** Rejected if it touches the AI/recording disclosure, drops a placeholder, or changes more than
    30 lines.
-4. **Prove it.** The failed cases plus a few cases that already passed are re-run, same number of calls, before and
-   after.
+4. **Prove it.** The failed cases plus a few cases that already passed are re-run with fresh calls only, same number
+   before and after. A one-sided Fisher test says how likely the gain is to be luck; "ready" needs p < 0.2 and no
+   passing case getting worse.
 5. **Morning report.** `runs/<night>/report.html`: before/after score, the exact change, the agent's reasoning, and
    what it cost. Nothing goes live until a person approves.
 
@@ -24,6 +25,10 @@ python3 -m nightshift check                      # setup check, no spend
 python3 -m nightshift night --mock --from-run FILE --no-retest   # whole loop at $0
 python3 -m nightshift night --from-run FILE      # real fix on HarnessRouter + re-test
 python3 -m nightshift night                      # full night: simulate all cases first
+python3 -m nightshift retest runs/<night>         # re-run the proof for a night that has a fix
+python3 -m nightshift approve runs/<night>        # human gate: saves the fix, never puts it live
+python3 -m nightshift stage runs/<night>          # 6-slide demo view of one night
+python3 -m nightshift export <night>              # public static copy in site/ (scanned; never deploys)
 python3 -m unittest discover -s tests            # tests, no network
 ```
 Needs `HR_API_KEY` in `nightshift/.env` (git-ignored) and the `demo-factory-nightshift` test checkout. Simulated

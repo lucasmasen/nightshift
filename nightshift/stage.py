@@ -53,6 +53,8 @@ def render(night_dir: Path) -> str:
                     f"<div class='bar'><i class='b' style='width:{100 * bp / bt if bt else 0:.0f}%'></i></div>"
                     f"<div class='bar'><i class='a' style='width:{100 * ap / at if at else 0:.0f}%'></i></div>"
                     f"<div class='n'>{bp}/{bt} &rarr; {ap}/{at}</div></div>")
+    evidence = (f"{s.get('retest_repeat', '')} fresh calls per case · chance this is luck: "
+                f"{s['p_value']:.0%} ({s.get('evidence', '')})") if "p_value" in s else ""
     where = f"{t.get('where', 'HarnessRouter')}" + (f" · {t['model']}" if t.get("model") else "")
     spend = f" · ${t['spend_usd']:.2f}" if isinstance(t.get("spend_usd"), (int, float)) else ""
     score = (f"{b.get('passed', 0)}/{b.get('total', 0)} &rarr; {a.get('passed', 0)}/{a.get('total', 0)}" if a else "not re-tested")
@@ -85,7 +87,7 @@ button.done{{background:var(--c)}} .hint{{position:fixed;bottom:14px;right:18px;
 <div class="mute">{html.escape(where)}{spend} · harness {html.escape(str(t.get("harness_id", "")))}</div></section>
 <section><div class="k">The fix</div><div class="diff">{_diff(s.get("diff", "")) or "No change."}</div>
 <div class="mute" style="margin-top:16px">Safety check: disclosure untouched, placeholders kept, under 30 lines.</div></section>
-<section><div class="k">Proof · same calls, before and after</div><h2>{score}</h2>{"".join(bars)}
+<section><div class="k">Proof · same calls, before and after</div><h2>{score}</h2><div class="mute" style="margin:-12px 0 18px">{html.escape(evidence)}</div>{"".join(bars)}
 <div class="legend">grey = before · green = after</div></section>
 <section><div class="k">7am</div><h1>Nothing went live.</h1><h2 class="mute">The fix waits for a person.</h2>
 <div><button onclick="this.textContent='Approved ✓';this.classList.add('done')">Approve</button></div></section>

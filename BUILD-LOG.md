@@ -28,4 +28,19 @@ For weeks I fixed it by hand: run test calls, read the failures, tweak the instr
 - HarnessRouter's free plan covers agent time but not the model: first task came back `402 no_key`. Added a model
   key under Bring Your Own Key.
 
-**Next.** First real overnight fix, then the before/after numbers.
+**First real night (6:48pm).** HarnessRouter's Claude Code agent (Claude Sonnet 5.5) read the 5 most-failed calls,
+found 3 causes and changed 4 lines in under a minute:
+- two questions joined with "and" or "if so" still count as two questions;
+- after a failed alert, never imply a callback is on its way;
+- "today please, but it's not an emergency" isn't an urgent booking.
+
+**The number I almost posted, and why I didn't.** The first re-test said 27/33 to 30/33. But "before" reused the
+exact calls that had failed, and those were picked *because* they failed, so "before" looked worse than it was.
+Counting fresh calls only, there was no real gain. So Nightshift now re-tests with fresh calls only and reports how
+likely the gain is to be luck.
+
+**Clean result:** 23/32 to 29/32 fresh calls (72% to 91%). The failed-alert call went from 1/4 to 4/4. One case
+(drunk caller) went 3/4 to 2/4, likely noise. Chance the overall gain is luck: about 5%. Simulator spend today:
+about $1.33.
+
+**Next.** Approve or not, then night 2 on the next five failures.

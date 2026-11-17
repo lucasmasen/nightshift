@@ -227,3 +227,21 @@ class DashboardTests(unittest.TestCase):
                 self.assertIn("7/10", page)
             finally:
                 config.RUNS, dashboard.APPROVED = old_runs, old_project
+
+
+class StatsTests(unittest.TestCase):
+    def test_fisher(self):
+        from nightshift import stats
+        self.assertAlmostEqual(stats.fisher_improved(23, 32, 29, 32), 0.053, places=2)
+        self.assertEqual(stats.fisher_improved(5, 5, 5, 5), 1.0)
+        self.assertLess(stats.fisher_improved(0, 10, 10, 10), 0.001)
+        self.assertGreater(stats.fisher_improved(9, 10, 5, 10), 0.9)
+
+    def test_verdict(self):
+        from nightshift.__main__ import verdict
+        s = {"before": {"passed": 23, "total": 32}, "after": {"passed": 29, "total": 32}, "worse": [], "broke": []}
+        self.assertTrue(verdict(s).startswith("Ready"))
+        s["broke"] = ["book_basic"]
+        self.assertTrue(verdict(s).startswith("Better"))
+        s = {"before": {"passed": 30, "total": 32}, "after": {"passed": 31, "total": 32}}
+        self.assertIn("could be luck", verdict(s))
