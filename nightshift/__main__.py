@@ -295,6 +295,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--by", default="lucas")
     ap.add_argument("--force", action="store_true")
     sub.add_parser("dashboard", help="Rebuild runs/index.html")
+    sv = sub.add_parser("serve", help="Local web app with real Approve/Reject buttons (127.0.0.1 only)")
+    sv.add_argument("--port", type=int, default=8765)
     rj = sub.add_parser("reject", help="Human 'no': record why, so the next night's agent learns from it")
     rj.add_argument("dir")
     rj.add_argument("--why", required=True)
@@ -396,6 +398,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if a.cmd == "stage":
         log(str(stage.write(Path(a.dir))))
+        return 0
+    if a.cmd == "serve":
+        from . import serve
+        serve.run(a.port)
         return 0
     if a.cmd == "reject":
         ok, msg = dashboard.reject(Path(a.dir), a.by, a.why)

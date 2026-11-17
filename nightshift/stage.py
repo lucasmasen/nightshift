@@ -76,7 +76,7 @@ def render(night_dir: Path, start: int = 0, caption: str = "") -> str:
                 f"{s['p_value']:.0%} ({s.get('evidence', '')})") if "p_value" in s else ""
     ap = s.get("approved")
     approve_button = (f"<button class='done'>Approved ✓ by {html.escape(str(ap.get('by')))}</button>" if ap else
-                      "<button onclick=\"this.textContent='Approved ✓';this.classList.add('done')\">Approve</button>")
+                      "<button id='approve' onclick=\"this.textContent='Approved ✓';this.classList.add('done')\">Approve</button>")
     where = f"{t.get('where', 'HarnessRouter')}" + (f" · {t['model']}" if t.get("model") else "")
     fix_usd = t.get("est_cost_usd")
     spend = f" · fix cost about ${fix_usd:.2f}" if isinstance(fix_usd, (int, float)) else ""

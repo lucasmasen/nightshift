@@ -392,3 +392,37 @@ class LessonTests(unittest.TestCase):
             text = p.read_text()
             self.assertIn("cut_hand_medical (2/4 to 0/4)", text)
             self.assertIn("excluded injuries", text)
+
+
+class ServeTests(unittest.TestCase):
+    def test_reject_flow_and_token(self):
+        import threading
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+        from nightshift import config, lessons, serve
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d)
+            old = (config.RUNS, lessons.LESSONS)
+            config.RUNS, lessons.LESSONS = t / "runs", t / "lessons.md"
+            try:
+                night = config.RUNS / "2026-11-16-010203"
+                night.mkdir(parents=True)
+                (night / "summary.json").write_text(json.dumps({"verdict": "Don't approve: x", "baseline_passed": 1,
+                                                                "baseline_total": 2, "agent_summary": {"summary": "s"}}))
+                (night / "report.html").write_text("<html><body><main>r</main></body></html>")
+                srv = ThreadingHTTPServer(("127.0.0.1", 0), serve.Handler)
+                threading.Thread(target=srv.serve_forever, daemon=True).start()
+                base = f"http://127.0.0.1:{srv.server_address[1]}"
+                page = urllib.request.urlopen(base + "/night/2026-11-16-010203").read().decode()
+                self.assertIn("Not approvable", page)
+                with self.assertRaises(urllib.error.HTTPError):
+                    urllib.request.urlopen(base + "/night/2026-11-16-010203/reject", data=b"t=bad&why=x")
+                body = urllib.parse.urlencode({"t": serve.TOKEN, "why": "made the cut-hand call worse"}).encode()
+                urllib.request.urlopen(base + "/night/2026-11-16-010203/reject", data=body)
+                self.assertIn("cut-hand", json.loads((night / "summary.json").read_text())["rejected"]["why"])
+                self.assertIn("made the cut-hand call worse", lessons.LESSONS.read_text())
+                srv.shutdown()
+            finally:
+                config.RUNS, lessons.LESSONS = old
