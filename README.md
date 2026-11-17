@@ -41,6 +41,13 @@ python3 -m nightshift golive runs/<night>         # dry run; --really puts an ap
 python3 -m nightshift agent examples/bayview-dental --mock   # ANY voice agent: prompt.md + call transcripts
 ```
 
+## Real calls become permanent tests
+On a real-call night the fix agent reads the whole scrubbed calls (automatic flags miss things), and every call
+that went wrong is turned into a test: the caller's own lines in order, names/numbers/addresses swapped for made-up
+ones, graded on what went wrong last time. It's saved to the test copy's `demo_line/suite_extra.json` and replayed
+first in the proof, then kept forever, so the same mistake can't quietly come back. Nightly runs skip calls an
+earlier night already reviewed.
+
 ## Any voice agent, not just Godfrey
 Point `agent` at a folder with `prompt.md` and `calls/*.txt` (or `calls.jsonl`), plus optional `facts.md` and
 `protect.txt` (lines that must never change). There's no grader for someone else's agent, so the HarnessRouter agent
