@@ -85,7 +85,7 @@ def landing(nights: list[str]) -> str:
                 f"<p class='links'><a href='{html.escape(n)}/stage.html'>Watch the night (6 slides)</a> · "
                 f"<a href='{html.escape(n)}/report.html'>Full report</a>"
                 + (f" · <a href='{html.escape(n)}/demo.mp4'>Video</a>" if (SITE / n / "demo.mp4").exists() else "")
-                + " · <a href='nights.html'>Every night</a></p>")
+                + " · <a href='nights.html'>Every night</a> · <a href='https://github.com/lucasmasen/nightshift'>Code on GitHub</a></p>")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nightshift</title><style>
 body{{margin:0;background:#0f1512;color:#eef2ee;font:18px/1.55 -apple-system,system-ui,sans-serif}}

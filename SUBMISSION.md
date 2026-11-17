@@ -34,6 +34,8 @@ call transcripts, and it finds the bad calls itself.
 "kakhao", project `nightshift-bighack`; public; to update: `python3 -m nightshift export <nights...>` then redeploy
 the site folder with `vercel deploy --prod`).
 
+**GitHub (public, 11/17):** https://github.com/lucasmasen/nightshift (history scrubbed: no keys, no private prompt text, commits use the GitHub no-reply email)
+
 **Demo video:** auto-built silent captioned cut: https://nightshift-bighack.vercel.app/2026-11-16-184822/demo.mp4
 (50 s). Better: upload to YouTube as Unlisted (with Lucas's voiceover) and use that link.
 
