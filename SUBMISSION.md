@@ -25,9 +25,10 @@ AI phone agents make mistakes at 2am and nobody notices until a customer complai
 for your voice agent. Every night it reads the agent's calls, finds the ones that went wrong, and sends them to a
 HarnessRouter agent (Claude Code harness) that traces each failure to the instruction that caused it and makes the
 smallest fix. A safety check rejects any fix that touches the AI and call-recording disclosure. Then Nightshift
-re-runs the failed calls plus calls that already worked, before and after, and leaves a morning report with the
-score, the exact change and the reasoning. Nothing goes live until a person approves it. Built on my after-hours
-receptionist for plumbers (demo shop: Sunset Plumbing, made up). For anyone running a voice agent.
+re-tests the fix on fresh calls and says how likely the gain is to be luck. Nothing goes live until a person
+approves it. On my after-hours receptionist for plumbers (demo shop Sunset Plumbing, made up), night 1's fix took
+178 simulated test calls from 79% to 86% passing. It also works on any voice agent: give it the instructions and
+call transcripts, and it finds the bad calls itself.
 
 **Live link or GitHub:** https://nightshift-bighack.vercel.app (published 11/16 ~7:35pm on Lucas's Vercel team
 "kakhao", project `nightshift-bighack`; public; to update: `python3 -m nightshift export <nights...>` then redeploy
