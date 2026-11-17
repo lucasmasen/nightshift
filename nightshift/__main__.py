@@ -199,7 +199,12 @@ def real_night(args: argparse.Namespace, out: Path, stamp: str) -> int:
     if problems:
         summary["verdict"] = "Nightshift's fix was rejected by the safety check, so nothing was re-tested."
         return finish(out, summary)
-    cases = rn.cases + [g for g in DEFAULT_GUARDS[:max(0, args.guards)] if g not in rn.cases]
+    # Prove what the agent actually fixed: twins of the flags it names as fixed (fallback: every flagged behavior).
+    fixed = realcalls.fixed_flags(fix.report)
+    targets = realcalls.twins({f: 1 for f in fixed}, max(1, args.max_cases)) if fixed else rn.cases
+    summary.update(fixed_flags=fixed, failed_cases=targets)
+    log(f"   agent fixed: {', '.join(fixed) or '(not stated)'}; proving on: {', '.join(targets)}")
+    cases = targets + [g for g in DEFAULT_GUARDS[:max(0, args.guards)] if g not in targets]
     summary["retest_cases"] = cases
     if args.no_retest:
         summary["verdict"] = "Fix proposed and passed the safety check (not re-tested: --no-retest)."

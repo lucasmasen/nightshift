@@ -333,3 +333,10 @@ class RealCallTests(unittest.TestCase):
         from nightshift import realcalls
         cases = realcalls.twins({"emergency_no_address": 2, "number_question_twice": 1}, 3)
         self.assertEqual(cases, ["burst_pipe", "fast_address", "no_caller_id"])
+
+
+class FixedFlagTests(unittest.TestCase):
+    def test_fixed_flags_stop_at_left_alone(self):
+        from nightshift import realcalls
+        rep = "## Cause 1\n(`hung_up_first`)\n## Cause 2\n`invented_name`\n## Failures left alone\n`on_the_way`\n"
+        self.assertEqual(realcalls.fixed_flags(rep), ["hung_up_first", "invented_name"])

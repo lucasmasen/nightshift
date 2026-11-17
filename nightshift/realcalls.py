@@ -77,6 +77,13 @@ def twins(counts: dict[str, int], limit: int) -> list[str]:
     return out[:limit]
 
 
+def fixed_flags(agent_report: str) -> list[str]:
+    """Flags the agent says it fixed: the ones named before its "left alone / not caused" section."""
+    cut = re.search(r"^#+ .*(left alone|not caused|false positive|not fixed)", agent_report, re.I | re.M)
+    head = agent_report[:cut.start()] if cut else agent_report
+    return [f for f in dict.fromkeys(re.findall(r"`([a-z_]+)`", head)) if f in FLAG_TO_CASES]
+
+
 def load(days: int, limit: int, report_file: Path | None = None) -> RealNight:
     raw = report_file.read_text() if report_file else _run(["-m", "demo_line.real_call_qa", "--days", str(days), "--stdout"])
     redacted = _run(["-m", "demo_line.redact", "--keep-demo"], stdin=raw)
