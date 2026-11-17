@@ -52,7 +52,7 @@ with the burst-pipe case's 1/4 to 4/4: on 11/17 the unfixed prompt scored 3/4 on
 >
 > nightshift fixes that overnight. 178 test calls: 79% passed before, 86% after.
 >
-> [project link]
+> https://community.harnessrouter.ai/p/nightshift
 > @HarnessRouter #HarnessRouter #UHP #BigHackGame #BeatStanford
 
 **LinkedIn by link**. The Instagram post may not count
@@ -90,7 +90,7 @@ with the burst-pipe case's 1/4 to 4/4: on 11/17 the unfixed prompt scored 3/4 on
 >
 > nightshift fixes that overnight. on all 178 test calls: 79% passed before its fix, 86% after.
 >
-> [project link]
+> https://community.harnessrouter.ai/p/nightshift
 > #HarnessRouter #UHP #BigHackGame
 
 **LinkedIn (paste the post's link in the project's "Posted on LinkedIn?" field):**
@@ -100,5 +100,5 @@ with the burst-pipe case's 1/4 to 4/4: on 11/17 the unfixed prompt scored 3/4 on
 > night 1's fix, run on all 178 test calls: 79% passed before, 86% after. odds that's luck: about 5%.
 > it also works on other voice agents: point it at a prompt and a folder of call transcripts and it finds the bad calls itself.
 > building for berkeley.
-> [project link]
+> https://community.harnessrouter.ai/p/nightshift
 > #HarnessRouter #UHP #BigHackGame #BeatStanford
