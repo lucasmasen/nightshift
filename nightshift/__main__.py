@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import collect, config, cost, dashboard, export, fixer, guard, realcalls, report, retest, stage, stats
+from . import collect, config, cost, dashboard, export, fixer, guard, realcalls, report, retest, stage, stats, video
 from .hr import Client, HRError
 
 
@@ -299,6 +299,8 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--guards", type=int, default=3)
     ex = sub.add_parser("export", help="Build site/ (public static copy) from the named nights; never deploys")
     ex.add_argument("nights", nargs="+")
+    vd = sub.add_parser("video", help="Silent captioned demo video of one night (demo.mp4)")
+    vd.add_argument("dir")
     st = sub.add_parser("stage", help="Build the 6-slide demo view for one night")
     st.add_argument("dir")
     r = sub.add_parser("report")
@@ -341,6 +343,9 @@ def main(argv: list[str] | None = None) -> int:
         site, issues = export.build(a.nights)
         log(f"Built {site}" + ("" if not issues else "\nHeld back (fix before publishing):\n  " + "\n  ".join(issues)))
         return 0 if not issues else 1
+    if a.cmd == "video":
+        log(str(video.build(Path(a.dir))))
+        return 0
     if a.cmd == "stage":
         log(str(stage.write(Path(a.dir))))
         return 0

@@ -56,7 +56,7 @@ def _diff(diff: str) -> str:
     return "\n".join(out[:24])
 
 
-def render(night_dir: Path) -> str:
+def render(night_dir: Path, start: int = 0, caption: str = "") -> str:
     s = json.loads((night_dir / "summary.json").read_text())
     fails = (night_dir / "failures.md").read_text() if (night_dir / "failures.md").exists() else ""
     case, why, lines = first_failure(fails)
@@ -74,6 +74,9 @@ def render(night_dir: Path) -> str:
                     f"<div class='n'>{bp}/{bt} &rarr; {ap}/{at}</div></div>")
     evidence = (f"{s.get('retest_repeat', '')} fresh calls per case · chance this is luck: "
                 f"{s['p_value']:.0%} ({s.get('evidence', '')})") if "p_value" in s else ""
+    ap = s.get("approved")
+    approve_button = (f"<button class='done'>Approved ✓ by {html.escape(str(ap.get('by')))}</button>" if ap else
+                      "<button onclick=\"this.textContent='Approved ✓';this.classList.add('done')\">Approve</button>")
     where = f"{t.get('where', 'HarnessRouter')}" + (f" · {t['model']}" if t.get("model") else "")
     fix_usd = t.get("est_cost_usd")
     spend = f" · fix cost about ${fix_usd:.2f}" if isinstance(fix_usd, (int, float)) else ""
@@ -97,10 +100,10 @@ h1{{font-size:clamp(40px,6vw,84px);line-height:1.05;margin:16px 0}} h2{{font-siz
 .row small{{display:block;color:var(--mute);font-size:13px}} .bar{{height:18px;background:#0b1a10;border-radius:9px;overflow:hidden}}
 .bar i{{display:block;height:100%;border-radius:9px}} .b{{background:#55625a}} .a{{background:var(--g)}} .n{{text-align:right}}
 .legend{{color:var(--mute);font-size:16px}} button{{font:inherit;font-size:26px;padding:16px 34px;border-radius:12px;border:0;background:var(--g);color:#0f1512;font-weight:700;cursor:pointer}}
-button.done{{background:var(--c)}} .hint{{position:fixed;bottom:14px;right:18px;color:var(--mute);font-size:14px}}
+button.done{{background:var(--c)}} .cap{{position:fixed;left:0;right:0;bottom:0;padding:22px 8vw 28px;background:rgba(10,16,12,.92);color:var(--c);font-size:30px;font-weight:600;line-height:1.3;border-top:1px solid var(--line)}} .hint{{position:fixed;bottom:14px;right:18px;color:var(--mute);font-size:14px}}
 @media(max-width:700px){{.row{{grid-template-columns:1fr;}} .n{{text-align:left}}}}
 </style></head><body>
-<section class="on"><div class="k">{"Real calls" if s.get("mode") == "real" else "Last night"}</div><h1>Godfrey took {total} {"real " if s.get("mode") == "real" else ""}calls.</h1><div class="big">{total - passed}</div>
+<section><div class="k">{"Real calls" if s.get("mode") == "real" else "Last night"}</div><h1>Godfrey took {total} {"real " if s.get("mode") == "real" else ""}calls.</h1><div class="big">{total - passed}</div>
 <h2 class="mute">went wrong. Nobody was awake to notice.</h2></section>
 <section><div class="k">One of them · {html.escape(case)}</div><div class="call">{"".join(f"<div>{_line(x)}</div>" for x in lines)}</div>
 <div class="why">Graded fail: {html.escape(why[:240])}{"…" if len(why) > 240 else ""}</div></section>
@@ -112,11 +115,12 @@ button.done{{background:var(--c)}} .hint{{position:fixed;bottom:14px;right:18px;
 <section><div class="k">Proof · same calls, before and after</div><h2>{score}</h2><div class="mute" style="margin:-12px 0 18px">{html.escape(evidence)}</div>{"".join(bars)}
 <div class="legend">grey = before · green = after</div></section>
 <section><div class="k">7am</div><h1>Nothing went live.</h1><h2 class="mute">The fix waits for a person.</h2>
-<div><button onclick="this.textContent='Approved ✓';this.classList.add('done')">Approve</button></div></section>
-<div class="hint">space / → next · ← back</div>
+<div>{approve_button}</div></section>
+{f'<div class="cap">{html.escape(caption)}</div>' if caption else '<div class="hint">space / → next · ← back</div>'}
 <script>
 const s=[...document.querySelectorAll('section')];let i=0;
 function go(n){{i=Math.max(0,Math.min(s.length-1,n));s.forEach((x,j)=>x.classList.toggle('on',j===i));}}
+go({start});
 addEventListener('keydown',e=>{{if(['ArrowRight',' ','PageDown'].includes(e.key)){{e.preventDefault();go(i+1)}}if(['ArrowLeft','PageUp'].includes(e.key))go(i-1)}});
 addEventListener('click',e=>{{if(e.target.tagName!=='BUTTON')go(i+1)}});
 </script></body></html>"""
