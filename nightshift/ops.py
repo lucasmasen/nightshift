@@ -114,9 +114,11 @@ def publish(log=print, include_real: bool = False) -> str:
         shutil.copytree(keep, DEPLOY / ".vercel")
         shutil.rmtree(keep)
     p = subprocess.run(["vercel", "deploy", "--prod", "--yes"], cwd=DEPLOY, capture_output=True, text=True, timeout=600)
-    url = next((ln.split()[-1] for ln in p.stdout.splitlines() if "Aliased" in ln), "")
-    if p.returncode != 0 or not url:
+    url = next((ln.split()[-1] for ln in (p.stdout + p.stderr).splitlines() if "Aliased" in ln), "")
+    if not url:  # newer CLIs can exit non-zero after a good deploy (a JSON hint block); "Aliased" is the real signal
         raise RuntimeError("Vercel deploy failed:\n" + (p.stdout + p.stderr)[-800:])
+    if p.returncode != 0:
+        log(f"(vercel exited {p.returncode} but the site was aliased, so the deploy went through)")
     log(f"Published {len(nights)} nights: {url}")
     return url
 
@@ -201,23 +203,34 @@ def arena(night_dir: Path, bases: list[str], repeat: int = 4, log=print) -> dict
 
 
 def arena_prove(night_dir: Path, repeat: int = 4, log=print) -> dict:
-    """The proof half of an arena run whose fixes already exist (arena.<base>.prompt.md): same cases, fresh calls."""
+    """The proof half of an arena run whose fixes already exist (arena.<base>.prompt.md): same cases, fresh calls.
+    Saves after each run and skips runs already done, so a run stopped by the $2/day cap resumes the next day."""
     s = dashboard.load(night_dir)
     res = s.get("arena") or {}
     cases = res.get("cases") or []
-    old = (night_dir / "prompt.before.md").read_text()
-    before = retest.run_suite(cases, old, repeat=repeat, log=log, fresh=True)
-    res["before"] = {"passed": before.run.passed, "total": before.run.total}
+    if res.get("repeat") != repeat:  # a different sample size can't be mixed with earlier runs
+        res.pop("before", None)
+        for e in res.get("entries", {}).values():
+            e.pop("after", None)
     res["repeat"] = repeat
+
+    def save() -> None:
+        s["arena"] = res
+        dashboard.save(night_dir, s)
+        (night_dir / "arena.json").write_text(json.dumps(res, indent=2, default=str))
+
+    if "before" not in res:
+        before = retest.run_suite(cases, (night_dir / "prompt.before.md").read_text(), repeat=repeat, log=log, fresh=True)
+        res["before"] = {"passed": before.run.passed, "total": before.run.total, "file": before.run.path.name}
+        save()
     for base, e in res.get("entries", {}).items():
         f = night_dir / f"arena.{base}.prompt.md"
-        if e.get("guard") or not f.exists():
+        if e.get("guard") or not f.exists() or "after" in e:
             continue
         r = retest.run_suite(cases, f.read_text(), repeat=repeat, log=log, fresh=True)
-        e["after"] = {"passed": r.run.passed, "total": r.run.total}
-    s["arena"] = res
-    dashboard.save(night_dir, s)
-    (night_dir / "arena.json").write_text(json.dumps(res, indent=2, default=str))
+        e["after"] = {"passed": r.run.passed, "total": r.run.total, "file": r.run.path.name}
+        save()
+    save()
     return res
 
 
