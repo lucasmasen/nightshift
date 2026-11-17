@@ -609,7 +609,7 @@ class TwinTests(unittest.TestCase):
         report = ("# Nightshift report\nabc12345 overview\n## Cause 1: bye now too early\n- Failed case: abc12345\n"
                   "- Bad moment: Godfrey: \"Bye now.\" to [NAME]\n## Cause 2: other call\n- Failed case: zzz\n")
         name, case = twins.build("abc12345", twins.by_call(full)["abc12345"], report, "2026-11-17")
-        self.assertEqual(name, "real_20261117_abc123")
+        self.assertEqual(name, "real_20261117_abc12345")
         self.assertEqual(case["lines"], ["I smell gas. This is Sam.", "We're out. Call me at 415 555 0123."])
         self.assertEqual(case["expect"], ["alert", "gas_safety"])
         self.assertIn("bye now too early", case["judge"])

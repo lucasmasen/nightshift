@@ -24,6 +24,7 @@ else
 fi
 # The fix from Lucas's friend's real call (11/17): prove it on its new twin test plus related cases (~$0.30)
 python3 -m nightshift retest runs/2026-11-17-143741 --repeat 4 || echo "real-call retest: see above"
+python3 -m nightshift retest runs/2026-11-17-152548 --repeat 4 || echo "turtle-call retest: see above"
 python3 -m nightshift publish || echo "publish: see above"
 python3 -m nightshift card $N --day 3
 echo "Done. Arena + re-check results: python3 -m nightshift serve, then open night $N"
