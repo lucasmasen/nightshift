@@ -38,14 +38,20 @@ Godfrey prompt is git-ignored and never in it), or (b) the dashboard page hosted
 for the side-by-side, add its ID as a second line.
 
 ## Post drafts (Lucas's voice; add the project link once the project page exists)
-**X:**
-> my ai receptionist for plumbers passed 79% of its test calls tonight. so i'm building nightshift: it reads every call overnight, fixes what went wrong, and proves the fix before i wake up
+Real numbers, night 1 (11/16): fresh re-test 23/32 to 29/32 (72% to 91%), burst-pipe/failed-alert call 1/4 to 4/4,
+~5% chance it's luck. Simulated calls; say so.
+
+**X (must include the project link + #HarnessRouter #UHP #BigHackGame to count):**
+> my ai receptionist told a caller with a burst pipe "the call will go to your number." the alert had failed. nobody was coming.
+> built nightshift to catch that overnight. it found the cause, changed 4 lines, and the burst pipe test went from 1 of 4 to 4 of 4
 > [project link]
 > #HarnessRouter #UHP #BigHackGame #BeatStanford
 
-**LinkedIn:**
-> building nightshift for the big hack game (berkeley).
-> ai phone agents make mistakes at 2am and nobody notices. nightshift reads every call overnight, finds what went wrong, fixes the agent's instructions with a harnessrouter agent, and re-tests the fix before anyone wakes up. nothing goes live until a person approves it.
-> night 1 baseline: 140 of 178 simulated calls passed (79%).
+**LinkedIn (paste the post's link in the project's "Posted on LinkedIn?" field):**
+> my ai phone receptionist for plumbers made a promise it couldn't keep.
+> a simulated caller had a burst pipe. the alert to the plumber failed. the ai still said "i'm letting the team know right now." nobody was coming.
+> so for the big hack game i built nightshift. every night it reads the agent's calls, sends the failures to a claude code agent on harnessrouter, fixes the instructions, and re-tests the fix on fresh calls before anyone wakes up. nothing goes live until a person approves.
+> night 1: 72% to 91% of fresh test calls passed. the burst pipe call went from 1 of 4 to 4 of 4. odds that's luck: about 5%.
+> building for berkeley.
 > [project link]
 > #HarnessRouter #UHP #BigHackGame #BeatStanford
