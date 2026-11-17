@@ -89,8 +89,8 @@ the 1-of-4 to 4-of-4 case, which looks noisier than it did: today the unfixed pr
 >
 > real number: 140 to 153. always check the boring explanation first
 
-**12. the dentist (contest) (283)**
-> pointed nightshift at a made up dental office's ai.
+**12. the dentist (contest) (277)**
+> pointed nightshift at a fake dental office's ai.
 >
 > it found the ai telling a patient "the dentist will call you back tonight" when nobody can be paged at night, and giving an ibuprofen dose.
 >
