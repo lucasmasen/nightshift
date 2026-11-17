@@ -309,6 +309,9 @@ def main(argv: list[str] | None = None) -> int:
     ar.add_argument("dir")
     ar.add_argument("--bases", default="claude-code,codex")
     ar.add_argument("--repeat", type=int, default=4)
+    ap2 = sub.add_parser("arena-prove", help="Prove the fixes an earlier `arena --repeat 0` made")
+    ap2.add_argument("dir")
+    ap2.add_argument("--repeat", type=int, default=4)
     gl = sub.add_parser("golive", help="Put an approved, verified fix on the real phone line (a person runs this)")
     gl.add_argument("dir")
     gl.add_argument("--really", action="store_true")
@@ -370,8 +373,9 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "card":
         log(str(ops.card(Path(a.dir), a.day)))
         return 0
-    if a.cmd == "arena":
-        res = ops.arena(Path(a.dir), [b.strip() for b in a.bases.split(",") if b.strip()], a.repeat, log=log)
+    if a.cmd in ("arena", "arena-prove"):
+        res = (ops.arena(Path(a.dir), [b.strip() for b in a.bases.split(",") if b.strip()], a.repeat, log=log)
+               if a.cmd == "arena" else ops.arena_prove(Path(a.dir), a.repeat, log=log))
         b = res.get("before", {})
         log(f"Before: {b.get('passed')}/{b.get('total')}")
         for base, e in res["entries"].items():

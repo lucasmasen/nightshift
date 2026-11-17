@@ -137,8 +137,9 @@ def arena(night_dir: Path, bases: list[str], repeat: int = 4, log=print) -> dict
     results: dict = {"cases": cases, "repeat": repeat, "entries": {}}
     saved = (config.HARNESS_BASE, config.HARNESS_NAME)
     try:
-        before = retest.run_suite(cases, old, repeat=repeat, log=log, fresh=True)
-        results["before"] = {"passed": before.run.passed, "total": before.run.total}
+        if repeat > 0:  # repeat 0: fixes only, prove later with `arena-prove`
+            before = retest.run_suite(cases, old, repeat=repeat, log=log, fresh=True)
+            results["before"] = {"passed": before.run.passed, "total": before.run.total}
         for base in bases:
             config.HARNESS_BASE, config.HARNESS_NAME = base, f"Nightshift (voice agent fixer, {base})"
             log(f"Arena: {base}")
@@ -149,7 +150,7 @@ def arena(night_dir: Path, bases: list[str], repeat: int = 4, log=print) -> dict
                      "harness_id": fix.trace.get("harness_id"), "guard": guard.check(old, fix.prompt),
                      "changed_lines": guard.changed_lines(old, fix.prompt)}
             (night_dir / f"arena.{base}.prompt.md").write_text(fix.prompt)
-            if not entry["guard"]:
+            if not entry["guard"] and repeat > 0:
                 r = retest.run_suite(cases, fix.prompt, repeat=repeat, log=log, fresh=True)
                 entry["after"] = {"passed": r.run.passed, "total": r.run.total}
             results["entries"][base] = entry
@@ -159,6 +160,27 @@ def arena(night_dir: Path, bases: list[str], repeat: int = 4, log=print) -> dict
     dashboard.save(night_dir, s)
     (night_dir / "arena.json").write_text(json.dumps(results, indent=2, default=str))
     return results
+
+
+def arena_prove(night_dir: Path, repeat: int = 4, log=print) -> dict:
+    """The proof half of an arena run whose fixes already exist (arena.<base>.prompt.md): same cases, fresh calls."""
+    s = dashboard.load(night_dir)
+    res = s.get("arena") or {}
+    cases = res.get("cases") or []
+    old = (night_dir / "prompt.before.md").read_text()
+    before = retest.run_suite(cases, old, repeat=repeat, log=log, fresh=True)
+    res["before"] = {"passed": before.run.passed, "total": before.run.total}
+    res["repeat"] = repeat
+    for base, e in res.get("entries", {}).items():
+        f = night_dir / f"arena.{base}.prompt.md"
+        if e.get("guard") or not f.exists():
+            continue
+        r = retest.run_suite(cases, f.read_text(), repeat=repeat, log=log, fresh=True)
+        e["after"] = {"passed": r.run.passed, "total": r.run.total}
+    s["arena"] = res
+    dashboard.save(night_dir, s)
+    (night_dir / "arena.json").write_text(json.dumps(res, indent=2, default=str))
+    return res
 
 
 # ---- golive: put an approved, verified prompt on the real phone line ----------------------------------------------
