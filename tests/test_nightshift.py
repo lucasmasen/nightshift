@@ -634,6 +634,34 @@ class RealStageTests(unittest.TestCase):
         self.assertFalse(any("Get out" in ln and ln.startswith("!") for ln in lines))
 
 
+class LockTests(unittest.TestCase):
+    def test_second_run_waits_for_the_first(self):
+        import threading
+        import time
+        from nightshift import config, retest
+        old = config.TEST_CHECKOUT
+        with tempfile.TemporaryDirectory() as d:
+            config.TEST_CHECKOUT = Path(d)
+            order, msgs = [], []
+
+            def first():
+                with retest.checkout_lock(log=lambda m: None):
+                    order.append("a-in")
+                    time.sleep(0.6)
+                    order.append("a-out")
+            try:
+                t = threading.Thread(target=first)
+                t.start()
+                time.sleep(0.15)
+                with retest.checkout_lock(log=msgs.append):
+                    order.append("b-in")
+                t.join()
+            finally:
+                config.TEST_CHECKOUT = old
+        self.assertEqual(order, ["a-in", "a-out", "b-in"])
+        self.assertIn("waiting", msgs[0])
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

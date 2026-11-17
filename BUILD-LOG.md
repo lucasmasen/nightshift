@@ -110,4 +110,4 @@ hand the fix agent the whole scrubbed calls; it found all three causes and fixed
 surfaced and were fixed the same hour: a first name slipped past the scrubber in a short excerpt, and "call 911"
 was being scrubbed as an address. The call became a permanent test (`real_gas_troll`), every flagged real call now
 does automatically, and nightly runs skip calls already reviewed. Loop round 1: the stage slides now tell a
-real-call night properly (the real call, the cause that matches it, "A real person called Godfrey."). Round 2: the real-call report says "real call" (it said "simulated") and names the permanent test made from it.
+real-call night properly (the real call, the cause that matches it, "A real person called Godfrey."). Round 2: the real-call report says "real call" (it said "simulated") and names the permanent test made from it. Round 3: a lock so the 12:10am script and the 2am nightly can never swap prompts in the test copy at the same time.

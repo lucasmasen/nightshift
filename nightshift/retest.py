@@ -6,10 +6,13 @@ own $2/day cap, which counts every demo-factory* checkout.
 """
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import os
 import re
 import signal
 import subprocess
+import time
 from dataclasses import dataclass
 
 from . import collect, config
@@ -53,9 +56,42 @@ def current_prompt() -> str:
     return (config.TEST_CHECKOUT / config.PROMPT_REL).read_text()
 
 
+class Busy(RuntimeError):
+    """Another Nightshift run held the test checkout for too long."""
+
+
+@contextlib.contextmanager
+def checkout_lock(log=print, wait_s: int = 3 * 3600):
+    """One simulator run at a time in the test checkout: each run swaps prompt.md in and out, so two at once (say the
+    12:10am script still going at 2am) would test the wrong instructions. Waits for the other run to finish."""
+    path = config.TEST_CHECKOUT / ".nightshift.lock"
+    with open(path, "a+") as f:
+        start, told = time.monotonic(), False
+        while True:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if not told:
+                    log("  another Nightshift run is using the test checkout; waiting for it to finish...")
+                    told = True
+                if time.monotonic() - start > wait_s:
+                    raise Busy("The test checkout stayed busy for hours; not running.")
+                time.sleep(15)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def run_suite(cases: list[str], prompt_text: str | None = None, repeat: int = 1, log=print,
               fresh: bool = False) -> Result:
     """Run the given cases (all if empty) with prompt_text swapped in, or the checkout's prompt if None."""
+    with checkout_lock(log):
+        return _run_suite(cases, prompt_text, repeat, log, fresh)
+
+
+def _run_suite(cases: list[str], prompt_text: str | None, repeat: int, log, fresh: bool) -> Result:
     problems = checkout_ok()
     if problems:
         raise RuntimeError("; ".join(problems))
