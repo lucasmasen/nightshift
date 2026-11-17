@@ -304,3 +304,32 @@ class BigDropTests(unittest.TestCase):
         s = {"before": {"passed": 19, "total": 32, "cases": {"cut_hand_medical": [2, 4], "co_alarm": [0, 4]}},
              "after": {"passed": 26, "total": 32, "cases": {"cut_hand_medical": [0, 4], "co_alarm": [4, 4]}}}
         self.assertTrue(verdict(s).startswith("Don't approve: cut_hand_medical"))
+
+
+class RealCallTests(unittest.TestCase):
+    REPORT = """# Real-call QA
+
+**2 call(s)**
+
+## 11/08 6:06PM · call 01a1be0e · 138s · ended: customer-ended-call
+
+- **number_question_twice**: asked twice
+    - Godfrey: Is the number you're calling from good?
+- **emergency_no_address**: no address
+- **review_call**: read it
+
+## 11/09 6:22PM · call 01a1c343 · 44s · ended: x
+
+- **review_call**: average reply time 2.29s
+"""
+
+    def test_parse_counts_behavior_flags_only(self):
+        from nightshift import realcalls
+        calls, flagged, counts = realcalls.parse(self.REPORT)
+        self.assertEqual((calls, flagged), (2, 1))
+        self.assertEqual(counts, {"number_question_twice": 1, "emergency_no_address": 1})
+
+    def test_twins_map_to_known_cases(self):
+        from nightshift import realcalls
+        cases = realcalls.twins({"emergency_no_address": 2, "number_question_twice": 1}, 3)
+        self.assertEqual(cases, ["burst_pipe", "fast_address", "no_caller_id"])

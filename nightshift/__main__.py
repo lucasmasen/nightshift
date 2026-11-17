@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import collect, config, dashboard, fixer, guard, report, export, retest, stage, stats
+from . import collect, config, dashboard, export, fixer, guard, realcalls, report, retest, stage, stats
 from .hr import Client, HRError
 
 
@@ -79,6 +79,8 @@ def night(args: argparse.Namespace) -> int:
     log(f"Nightshift night {stamp} -> {out}")
 
     # 1. Tonight's calls.
+    if args.real_days or args.real_file:
+        return real_night(args, out, stamp)
     if args.from_run:
         base = collect.parse(Path(args.from_run))
         log(f"1. Calls: read {base.path.name}: {base.passed} of {base.total} passed")
@@ -158,6 +160,57 @@ def night(args: argparse.Namespace) -> int:
     return finish(out, summary)
 
 
+DEFAULT_GUARDS = ["book_basic", "reschedule_after_booking", "skeptic_badmouth_competitors"]
+
+
+def real_night(args: argparse.Namespace, out: Path, stamp: str) -> int:
+    """Night from the demo line's real calls: redacted real-call flags go to the fixer; simulated twins prove it."""
+    log(f"1. Calls: reading real calls from the last {args.real_days or '?'} days (Vapi, read-only), redacting...")
+    rn = realcalls.load(args.real_days or 0, max(1, args.max_cases), Path(args.real_file) if args.real_file else None)
+    log(f"   {rn.calls} real calls, {rn.flagged_calls} flagged: " + ", ".join(f"{k} x{v}" for k, v in rn.flag_counts.items()))
+    summary: dict = {"date": stamp, "agent": "Godfrey (Sunset Plumbing demo line), REAL calls", "mode": "real",
+                     "baseline_passed": rn.calls - rn.flagged_calls, "baseline_total": rn.calls,
+                     "baseline_file": "real calls", "flag_counts": rn.flag_counts, "failed_cases": rn.cases}
+    if not rn.cases:
+        summary["verdict"] = "Clean night: no real call was flagged."
+        return finish(out, summary)
+    (out / "failures.md").write_text(rn.report)
+    prompt_now = out / "prompt.before.md"
+    prompt_now.write_text(retest.current_prompt())
+    shop = config.TEST_CHECKOUT / config.SHOP_REL
+    log(f"2. Fix: {rn.flagged_calls} flagged real calls; simulated twins to prove it: {', '.join(rn.cases)}")
+    if args.mock:
+        fix = fixer.run_mock(prompt_now, out / "failures.md", shop, log=log)
+    else:
+        key = config.api_key()
+        if not key:
+            log("No HR_API_KEY in nightshift/.env. Add it, or run with --mock.")
+            return 1
+        fix = fixer.run_harnessrouter(Client(key), prompt_now, out / "failures.md", shop, log=log)
+    old = prompt_now.read_text()
+    (out / "prompt.proposed.md").write_text(fix.prompt)
+    (out / "nightshift-report.md").write_text(fix.report)
+    diff = guard.diff_text(old, fix.prompt)
+    (out / "change.diff").write_text(diff)
+    summary.update(agent_report=fix.report, diff=diff, trace=fix.trace, agent_summary=fix.summary)
+    problems = guard.check(old, fix.prompt)
+    summary["guard_problems"] = problems
+    log("3. Safety check: " + ("passed" if not problems else "REJECTED: " + " | ".join(problems)))
+    if problems:
+        summary["verdict"] = "Nightshift's fix was rejected by the safety check, so nothing was re-tested."
+        return finish(out, summary)
+    cases = rn.cases + [g for g in DEFAULT_GUARDS[:max(0, args.guards)] if g not in rn.cases]
+    summary["retest_cases"] = cases
+    if args.no_retest:
+        summary["verdict"] = "Fix proposed and passed the safety check (not re-tested: --no-retest)."
+        return finish(out, summary)
+    try:
+        prove(summary, cases, old, fix.prompt, args.repeat)
+    except retest.Refused as e:
+        summary["verdict"] = f"Fix proposed, but the re-test was refused by the $2/day simulator cap: {e}"
+    return finish(out, summary)
+
+
 def verdict(summary: dict) -> str:
     """Ready only when the gain is unlikely to be luck (one-sided Fisher p < 0.2) and no passing case got worse."""
     b, a = summary["before"], summary["after"]
@@ -221,6 +274,8 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--from-run", help="Use an existing suite run file instead of simulating tonight's calls")
     n.add_argument("--base", help="Harness base: claude-code (default) or codex")
     n.add_argument("--on-top-of", help="An approved night to build on: use its fixed prompt, skip the cases it fixed")
+    n.add_argument("--real-days", type=int, help="Start from the demo line's REAL calls of the last N days")
+    n.add_argument("--real-file", help="A saved real_call_qa report to start from (instead of fetching)")
     n.add_argument("--mock", action="store_true", help="Local stand-in for the HarnessRouter agent ($0)")
     n.add_argument("--no-retest", action="store_true", help="Stop after the safety check (no simulated calls)")
     n.add_argument("--repeat", type=int, default=4, help="Calls per case in the before/after re-test (default 3)")
@@ -266,9 +321,9 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "retest":
         d = Path(a.dir)
         summ = dashboard.load(d)
-        base = collect.parse(Path(summ.get("baseline_path") or
-                                  config.TEST_CHECKOUT / "demo_line" / "suite_runs" / summ["baseline_file"]))
-        cases = summ["failed_cases"] + pick_guard_cases(base, summ["failed_cases"], a.guards)
+        base = None if summ.get("retest_cases") else collect.parse(Path(
+            summ.get("baseline_path") or config.TEST_CHECKOUT / "demo_line" / "suite_runs" / summ["baseline_file"]))
+        cases = summ.get("retest_cases") or (summ["failed_cases"] + pick_guard_cases(base, summ["failed_cases"], a.guards))
         summ.pop("approved", None)
         try:
             prove(summ, cases, (d / "prompt.before.md").read_text(), (d / "prompt.proposed.md").read_text(), a.repeat)
