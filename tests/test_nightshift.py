@@ -340,3 +340,18 @@ class FixedFlagTests(unittest.TestCase):
         from nightshift import realcalls
         rep = "## Cause 1\n(`hung_up_first`)\n## Cause 2\n`invented_name`\n## Failures left alone\n`on_the_way`\n"
         self.assertEqual(realcalls.fixed_flags(rep), ["hung_up_first", "invented_name"])
+
+
+class CostTests(unittest.TestCase):
+    def test_fix_cost_from_tokens(self):
+        from nightshift import cost
+        u = {"input_tokens": 12, "output_tokens": 6213, "cache_write_tokens": 31506, "cache_read_tokens": 138178}
+        self.assertAlmostEqual(cost.fix_cost(u, "claude-sonnet-5-5"), 0.1686, places=3)
+        self.assertAlmostEqual(cost.fix_cost(u, "anthropic/claude-sonnet-5.5"), 0.1686, places=3)
+        self.assertIsNone(cost.fix_cost(u, "gpt-6.1-sol"))
+
+    def test_sim_cost_prefers_measured(self):
+        from nightshift import cost
+        out = "Paid calls: 32, estimated $0.16, measured $0.200 from tokens (0.63¢ a call)."
+        self.assertEqual(cost.sim_cost(out), 0.2)
+        self.assertEqual(cost.sim_cost("Paid calls: 4, estimated $0.02. Reused: 0"), 0.02)

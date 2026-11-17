@@ -42,7 +42,9 @@ def render(night: dict) -> str:
         rows.append(f"<tr class='{moved}'><td>{html.escape(c)}</td><td>{tag}</td><td>{_pct(bp, bt)}</td>"
                     f"<td>{_pct(ap, at) if a else '-'}</td></tr>")
     problems = "".join(f"<li>{html.escape(p)}</li>" for p in night.get("guard_problems", []))
-    trace = night.get("trace", {})
+    trace = dict(night.get("trace", {}))
+    if night.get("sim_cost_usd") is not None:
+        trace["proof_cost_usd"] = night.get("sim_cost_usd")
     trace_bits = [f"{k.replace('_', ' ')}: {html.escape(str(v))}" for k, v in trace.items() if v not in (None, "", {})]
     big = ""
     if b and a:

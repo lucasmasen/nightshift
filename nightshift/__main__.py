@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import collect, config, dashboard, export, fixer, guard, realcalls, report, retest, stage, stats
+from . import collect, config, cost, dashboard, export, fixer, guard, realcalls, report, retest, stage, stats
 from .hr import Client, HRError
 
 
@@ -244,8 +244,10 @@ def prove(summary: dict, cases: list[str], old: str, new: str, repeat: int) -> N
     """Fresh calls, same cases, same count, before and after; sets before/after/broke/verdict on summary."""
     failed = summary.get("failed_cases", [])
     log(f"4. Re-test: {len(cases)} cases x {repeat} fresh calls, before and after")
-    before = retest.run_suite(cases, old, repeat=repeat, log=log, fresh=True).run
-    after = retest.run_suite(cases, new, repeat=repeat, log=log, fresh=True).run
+    rb = retest.run_suite(cases, old, repeat=repeat, log=log, fresh=True)
+    ra = retest.run_suite(cases, new, repeat=repeat, log=log, fresh=True)
+    before, after = rb.run, ra.run
+    summary["sim_cost_usd"] = round(summary.get("sim_cost_usd", 0) + cost.sim_cost(rb.output) + cost.sim_cost(ra.output), 3)
     summary.update(before=score_dict(before), after=score_dict(after), retest_repeat=repeat)
     bc, ac = before.case_scores(), after.case_scores()
     worse = [c for c in cases if ac.get(c, (0, 1))[0] < bc.get(c, (0, 0))[0]]

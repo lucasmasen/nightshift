@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+from . import cost
 from .hr import Client, final_text
 
 SYSTEM_PROMPT = """You are Nightshift. Each night you review an AI phone receptionist's calls and fix its instructions.
@@ -89,6 +90,7 @@ def run_harnessrouter(client: Client, prompt: Path, failures: Path, shop: Path, 
     text = final_text(done)
     trace = {"where": "HarnessRouter", "harness_id": harness_id, "response_id": rid, "session_id": session,
              "model": done.get("served_model") or done.get("model"), "usage": done.get("usage")}
+    trace["est_cost_usd"] = cost.fix_cost(done.get("usage"), trace.get("model"))
     if session:
         try:
             s = client.request("GET", f"/v1/sessions/{session}")

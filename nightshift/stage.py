@@ -75,7 +75,10 @@ def render(night_dir: Path) -> str:
     evidence = (f"{s.get('retest_repeat', '')} fresh calls per case · chance this is luck: "
                 f"{s['p_value']:.0%} ({s.get('evidence', '')})") if "p_value" in s else ""
     where = f"{t.get('where', 'HarnessRouter')}" + (f" · {t['model']}" if t.get("model") else "")
-    spend = f" · ${t['spend_usd']:.2f}" if isinstance(t.get("spend_usd"), (int, float)) else ""
+    fix_usd = t.get("est_cost_usd")
+    spend = f" · fix cost about ${fix_usd:.2f}" if isinstance(fix_usd, (int, float)) else ""
+    if isinstance(s.get("sim_cost_usd"), (int, float)):
+        spend += f" · proof ${s['sim_cost_usd']:.2f} in test calls"
     score = (f"{b.get('passed', 0)}/{b.get('total', 0)} &rarr; {a.get('passed', 0)}/{a.get('total', 0)}" if a else "not re-tested")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nightshift</title><style>
