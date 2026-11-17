@@ -563,6 +563,22 @@ class ReplayTests(unittest.TestCase):
             subprocess.run = real
 
 
+class VapiImportTests(unittest.TestCase):
+    def test_transcript_and_prompt(self):
+        from nightshift import vapi_import
+        call = {"artifact": {"messages": [
+            {"role": "system", "message": "secret instructions"},
+            {"role": "bot", "message": "Hi, this is Ava."},
+            {"role": "user", "message": "my pipe burst"},
+            {"role": "tool_calls", "toolCalls": [{"function": {"name": "alert", "arguments": "{}"}}]},
+            {"role": "tool_call_result", "result": "ALERT FAILED"},
+            {"role": "user", "message": ""}]}}
+        self.assertEqual(vapi_import.transcript(call, "Ava"),
+                         "Ava: Hi, this is Ava.\nCaller: my pipe burst\n[alert: {}]\n[tool result: ALERT FAILED]")
+        a = {"model": {"messages": [{"role": "system", "content": "Be kind."}, {"role": "user", "content": "x"}]}}
+        self.assertEqual(vapi_import.system_prompt(a), "Be kind.")
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

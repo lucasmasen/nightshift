@@ -361,6 +361,10 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--guards", type=int, default=3)
     ex = sub.add_parser("export", help="Build site/ (public static copy) from the named nights; never deploys")
     ex.add_argument("nights", nargs="+")
+    iv = sub.add_parser("import-vapi", help="Pull a Vapi assistant's prompt + recent calls (redacted) into a folder")
+    iv.add_argument("assistant_id")
+    iv.add_argument("--days", type=int, default=7)
+    iv.add_argument("--out", help="Folder to write (default: tries/vapi-<id>)")
     nl = sub.add_parser("nightly", help="One whole unattended night: real calls, simulated calls, morning email")
     nl.add_argument("--no-email", action="store_true")
     nl.add_argument("--max-cases", type=int, default=4)
@@ -417,6 +421,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if a.cmd == "agent":
         return agent_night(a)
+    if a.cmd == "import-vapi":
+        from . import vapi_import
+        out = Path(a.out) if a.out else config.PROJECT / "tries" / f"vapi-{a.assistant_id[:8]}"
+        try:
+            vapi_import.run(a.assistant_id, out, a.days, log=log)
+        except (ValueError, RuntimeError, OSError) as e:
+            log(f"Import failed: {e}")
+            return 1
+        log(f"Next: python3 -m nightshift agent {out}")
+        return 0
     if a.cmd == "nightly":
         nightly.run(max_cases=a.max_cases, send_email=not a.no_email, log=log)
         dashboard.write()
