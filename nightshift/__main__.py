@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import anyagent, collect, config, cost, dashboard, export, fixer, guard, lessons, ops, realcalls, report, retest, stage, stats, video
+from . import anyagent, collect, mail, nightly, config, cost, dashboard, export, fixer, guard, lessons, ops, realcalls, report, retest, stage, stats, video
 from .hr import Client, HRError
 
 
@@ -81,13 +81,6 @@ def night(args: argparse.Namespace) -> int:
     # 1. Tonight's calls.
     if args.real_days or args.real_file:
         return real_night(args, out, stamp)
-    if args.from_run:
-        base = collect.parse(Path(args.from_run))
-        log(f"1. Calls: read {base.path.name}: {base.passed} of {base.total} passed")
-    else:
-        log("1. Calls: simulating tonight's calls with the current prompt...")
-        base = retest.run_suite(args.cases, repeat=1, log=log).run
-        log(f"   {base.passed} of {base.total} passed")
     # Stacking: build on an approved night's prompt and skip the cases it already fixed.
     stack_prompt, skip, builds_on = None, set(), None
     if args.on_top_of:
@@ -100,6 +93,13 @@ def night(args: argparse.Namespace) -> int:
         skip = set(ps.get("failed_cases", [])) | set(ps.get("skipped_cases", []))
         builds_on = prev.name
         log(f"   building on approved night {prev.name}; skipping the cases it fixed: {', '.join(sorted(skip))}")
+    if args.from_run:
+        base = collect.parse(Path(args.from_run))
+        log(f"1. Calls: read {base.path.name}: {base.passed} of {base.total} passed")
+    else:
+        log("1. Calls: simulating tonight's calls with " + ("the approved prompt..." if stack_prompt else "the current prompt..."))
+        base = retest.run_suite(args.cases, stack_prompt, repeat=1, log=log).run
+        log(f"   {base.passed} of {base.total} passed")
     counts: dict[str, int] = {}
     for c in base.failures:
         if c.case in skip:
@@ -350,6 +350,11 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--guards", type=int, default=3)
     ex = sub.add_parser("export", help="Build site/ (public static copy) from the named nights; never deploys")
     ex.add_argument("nights", nargs="+")
+    nl = sub.add_parser("nightly", help="One whole unattended night: real calls, simulated calls, morning email")
+    nl.add_argument("--no-email", action="store_true")
+    nl.add_argument("--max-cases", type=int, default=4)
+    dg = sub.add_parser("digest", help="Send (or save) a morning email for the given nights now, e.g. to test Gmail")
+    dg.add_argument("nights", nargs="*", help="Night folders (default: the newest two)")
     rc = sub.add_parser("recheck", help="Re-run the cases that flipped to fail in verify, old vs new prompt (~$0.45)")
     rc.add_argument("dir")
     rc.add_argument("cases", nargs="*")
@@ -400,6 +405,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if a.cmd == "agent":
         return agent_night(a)
+    if a.cmd == "nightly":
+        nightly.run(max_cases=a.max_cases, send_email=not a.no_email, log=log)
+        dashboard.write()
+        return 0
+    if a.cmd == "digest":
+        dirs = [Path(n) for n in a.nights] or [d for d, _ in dashboard.nights()[:2]]
+        items = [{"title": d.name, "night": d.name, "summary": dashboard.load(d)} for d in dirs]
+        subject, text, body = mail.render(items, datetime.now().strftime("%Y-%m-%d"))
+        log(mail.send(subject, text, body, datetime.now().strftime("%Y-%m-%d"), log=log))
+        return 0
     if a.cmd == "recheck":
         try:
             ops.recheck(Path(a.dir), a.cases, a.repeat, log=log)

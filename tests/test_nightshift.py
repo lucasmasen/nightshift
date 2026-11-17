@@ -491,6 +491,46 @@ class RehearseTests(unittest.TestCase):
             self.assertIn("NOTES=", stage.render(night, rehearse=True))
 
 
+class NightlyMailTests(unittest.TestCase):
+    def test_render_counts_only_waiting_fixes(self):
+        from nightshift import mail
+        items = [
+            {"title": "a", "night": "2026-11-18-020000", "summary": {"verdict": "Ready for approval: 1/3 to 3/3",
+             "before": {"passed": 1, "total": 3}, "after": {"passed": 3, "total": 3},
+             "diff": "--- x\n+++ y\n-old\n+new\n+more", "agent_summary": {"summary": "fixed <it>"}}},
+            {"title": "b", "night": "2026-11-17-020000", "summary": {"verdict": "Ready", "approved": {"by": "lucas"}}},
+            {"title": "c", "night": None, "summary": None, "note": "Skipped: today's $2 test budget was already used."},
+        ]
+        subject, text, body = mail.render(items, "2026-11-18")
+        self.assertEqual(subject, "Nightshift: 1 fix waiting for you")
+        self.assertIn("2 lines of the instructions changed.", text)
+        self.assertIn("Skipped: today's $2", text)
+        self.assertIn("fixed &lt;it&gt;", body)
+        self.assertIn("127.0.0.1:8765/night/2026-11-18-020000", body)
+
+    def test_send_without_gmail_saves_file(self):
+        import os
+        from nightshift import config, mail
+        with tempfile.TemporaryDirectory() as d:
+            old, saved_env = config.RUNS, {k: os.environ.pop(k, None) for k in ("GMAIL_USER", "GMAIL_APP_PASSWORD")}
+            old_load, old_notify = config.load_env, mail.notify
+            config.RUNS, config.load_env, mail.notify = Path(d), (lambda *a, **k: None), (lambda *a: None)
+            try:
+                where = mail.send("s", "t", "<p>b</p>", "2026-11-18", log=lambda m: None)
+                self.assertTrue(where.startswith("file:"))
+                self.assertTrue((Path(d) / "digest-2026-11-18.html").exists())
+            finally:
+                config.RUNS, config.load_env, mail.notify = old, old_load, old_notify
+                for k, v in saved_env.items():
+                    if v is not None:
+                        os.environ[k] = v
+
+    def test_nightly_item_notes(self):
+        from nightshift import nightly
+        self.assertIn("budget", nightly._item("x", 1, "Refused by the $2/day cap", None)["note"])
+        self.assertIn("Didn't run", nightly._item("x", 1, "boom\nlast line", None)["note"])
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve
