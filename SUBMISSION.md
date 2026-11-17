@@ -42,7 +42,7 @@ Real numbers, night 1 (11/16): fresh re-test 23/32 to 29/32 (72% to 91%), burst-
 ~5% chance it's luck. Simulated calls; say so.
 
 **X (must include the project link + #HarnessRouter #UHP #BigHackGame to count):**
-> my ai receptionist told a caller with a burst pipe "the call will go to your number." the alert had failed. nobody was coming.
+> my ai receptionist told a test caller with a burst pipe "the call will go to your number." the alert had failed. nobody was coming.
 > built nightshift to catch that overnight. it found the cause, changed 4 lines, and the burst pipe test went from 1 of 4 to 4 of 4
 > [project link]
 > #HarnessRouter #UHP #BigHackGame #BeatStanford
