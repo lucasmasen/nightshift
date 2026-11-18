@@ -76,8 +76,9 @@ def real_call_story() -> str:
         return (f"<h2 style='margin-top:34px'>A real person called it</h2><p>{total} real call"
                 f"{'' if total == 1 else 's'} to the demo line, {wrong} went wrong. The fix agent read the whole call, names and "
                 f"numbers scrubbed first. What it changed: {html.escape(what)}</p><p>"
-                + (f"The call became a permanent test ({html.escape(', '.join(twins))}): the caller's own words with "
-                   "made-up details, re-run against every future fix. " if twins else "")
+                + (("The call became a permanent test" if len(twins) == 1 else f"Each call became a permanent test "
+                    f"({len(twins)} in all)") + ": the caller's own words with made-up details, re-run against every "
+                   "future fix. " if twins else "")
                 + f"{proof} Nothing went live.</p>")
     return ""
 
