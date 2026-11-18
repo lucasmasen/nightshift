@@ -152,6 +152,17 @@ def _diff(diff: str) -> str:
     return "\n".join(out[:24])
 
 
+BLOCKED = ("Don't approve", "Not better")
+
+
+def _ending(blocked: bool, approve_button: str) -> str:
+    if blocked:
+        return ("<section><div class='k'>7am</div><h1>Nightshift blocked its own fix.</h1><h2 class='mute'>Nothing went "
+                "live. What went wrong goes to the next night's agent.</h2></section>")
+    return (f"<section><div class='k'>7am</div><h1>Nothing went live.</h1><h2 class='mute'>The fix waits for a "
+            f"person.</h2>\n<div>{approve_button}</div></section>")
+
+
 def render(night_dir: Path, start: int = 0, caption: str = "", rehearse: bool = False) -> str:
     s = json.loads((night_dir / "summary.json").read_text())
     fails = (night_dir / "failures.md").read_text() if (night_dir / "failures.md").exists() else ""
@@ -160,17 +171,27 @@ def render(night_dir: Path, start: int = 0, caption: str = "", rehearse: bool = 
     total, passed = s.get("baseline_total", 0), s.get("baseline_passed", 0)
     t = s.get("trace") or {}
     b, a = s.get("before") or {}, s.get("after") or {}
+    blocked = bool(a) and str(s.get("verdict", "")).startswith(BLOCKED)
+    # The cases that stopped it: lost 2 or more passes (the same rule as the verdict).
+    broke = {c for c, (ap_, _) in (a.get("cases") or {}).items()
+             if (b.get("cases") or {}).get(c, (0, 0))[0] - ap_ >= 2} if blocked else set()
     bars = []
-    for c in sorted(set(b.get("cases", {})) | set(a.get("cases", {}))):
+    order = sorted(set(b.get("cases", {})) | set(a.get("cases", {})))
+    if blocked:  # what got worse first: that's why it was stopped
+        order.sort(key=lambda c: c not in broke)
+    for c in order:
         bp, bt = b.get("cases", {}).get(c, (0, 0))
         ap, at = a.get("cases", {}).get(c, (0, 0))
-        tag = "fixed" if c in s.get("failed_cases", []) else "already passing"
+        tag = ("got worse" if c in broke else "fixed" if c in s.get("failed_cases", []) else "already passing")
         bars.append(f"<div class='row'><div class='name'>{html.escape(c)}<small>{tag}</small></div>"
                     f"<div class='bar'><i class='b' style='width:{100 * bp / bt if bt else 0:.0f}%'></i></div>"
-                    f"<div class='bar'><i class='a' style='width:{100 * ap / at if at else 0:.0f}%'></i></div>"
+                    f"<div class='bar'><i class='a{' bad' if c in broke else ''}' style='width:{100 * ap / at if at else 0:.0f}%'></i></div>"
                     f"<div class='n'>{bp}/{bt} &rarr; {ap}/{at}</div></div>")
     evidence = html.escape(f"{s.get('retest_repeat', '')} fresh calls per case · chance this is luck: "
                            f"{s['p_value']:.0%} ({s.get('evidence', '')})") if "p_value" in s else ""
+    if blocked:
+        evidence = ("Blocked: a call lost 2 or more of its passes. Any drop like that stops the fix, however "
+                    "good the rest looks.")
     ap = s.get("approved")
     approve_button = (f"<button class='done'>Approved ✓ by {html.escape(str(ap.get('by')))}</button>" if ap else
                       "<button id='approve' onclick=\"this.textContent='Approved ✓';this.classList.add('done')\">Approve</button>")
@@ -207,7 +228,7 @@ h1{{font-size:clamp(40px,6vw,84px);line-height:1.05;margin:16px 0}} h2{{font-siz
 .add{{background:#1f3a25;color:#bfe9c1}} .del{{background:#3f2020;color:#f3c1b8;text-decoration:line-through}} .ctx{{color:var(--mute)}}
 .row{{display:grid;grid-template-columns:260px 1fr 1fr 130px;gap:14px;align-items:center;margin:10px 0;font-size:18px}}
 .row small{{display:block;color:var(--mute);font-size:13px}} .bar{{height:18px;background:#0b1a10;border-radius:9px;overflow:hidden}}
-.bar i{{display:block;height:100%;border-radius:9px}} .b{{background:#55625a}} .a{{background:var(--g)}} .n{{text-align:right}}
+.bar i{{display:block;height:100%;border-radius:9px}} .b{{background:#55625a}} .a{{background:var(--g)}} .a.bad{{background:var(--r)}} .n{{text-align:right}}
 .full{{font-size:30px;margin:0 0 22px;color:#EDE6C8}} .full b{{color:#7BC67E}} .legend{{color:var(--mute);font-size:16px}} button{{font:inherit;font-size:26px;padding:16px 34px;border-radius:12px;border:0;background:var(--g);color:#0f1512;font-weight:700;cursor:pointer}}
 button.done{{background:var(--c)}} .cap{{position:fixed;left:0;right:0;bottom:0;padding:22px 8vw 28px;background:rgba(10,16,12,.92);color:var(--c);font-size:30px;font-weight:600;line-height:1.3;border-top:1px solid var(--line)}} .hint{{position:fixed;bottom:14px;right:18px;color:var(--mute);font-size:14px}}
 @media(max-width:700px){{.row{{grid-template-columns:1fr;}} .n{{text-align:left}}}}
@@ -221,10 +242,9 @@ button.done{{background:var(--c)}} .cap{{position:fixed;left:0;right:0;bottom:0;
 <div class="mute">{html.escape(where)}{spend} · harness {html.escape(str(t.get("harness_id", "")))}</div></section>
 <section><div class="k">The fix · what it added to the instructions</div><div class="adds">{"".join(f"<div>+ {html.escape(a)}</div>" for a in ranked_adds(s.get("diff", ""), why)) or "No change."}</div>
 <div class="mute" style="margin-top:16px">Safety check: disclosure untouched, placeholders kept, under 30 lines.</div></section>
-<section><div class="k">Proof · same calls, before and after</div><h2>{score}</h2><div class="mute" style="margin:-12px 0 18px">{evidence}</div>{full}{"".join(bars)}
+<section><div class="k">Proof · same calls, before and after</div><h2>{"<span class='err'>Blocked.</span> " if blocked else ""}{score}</h2><div class="mute" style="margin:-12px 0 18px">{evidence}</div>{full}{"".join(bars)}
 <div class="legend">grey = before · green = after</div></section>
-<section><div class="k">7am</div><h1>Nothing went live.</h1><h2 class="mute">The fix waits for a person.</h2>
-<div>{approve_button}</div></section>
+{_ending(blocked, approve_button)}
 {f'<div class="cap">{html.escape(caption)}</div>' if caption else '<div class="hint">space / → next · ← back</div>'}
 <script>
 const s=[...document.querySelectorAll('section')];let i=0;

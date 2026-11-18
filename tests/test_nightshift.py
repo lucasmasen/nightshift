@@ -1151,3 +1151,21 @@ class OneFixPerNightTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertIn("--real-days", calls[0])
         self.assertIn("Skipped: tonight's fix came from real calls", items[-1]["note"])
+
+
+class BlockedSlidesTests(unittest.TestCase):
+    def test_blocked_night_has_no_approve_button_and_says_why(self):
+        from nightshift import stage
+        with tempfile.TemporaryDirectory() as d:
+            n = Path(d)
+            (n / "summary.json").write_text(json.dumps({
+                "verdict": "Don't approve: burst_pipe dropped", "baseline_total": 4, "baseline_passed": 0,
+                "p_value": 0.96, "retest_repeat": 4,
+                "before": {"passed": 8, "total": 12, "cases": {"burst_pipe": [4, 4], "swear": [4, 4], "x": [0, 4]}},
+                "after": {"passed": 5, "total": 12, "cases": {"burst_pipe": [1, 4], "swear": [3, 4], "x": [1, 4]}}}))
+            h = stage.render(n)
+        self.assertIn("Nightshift blocked its own fix.", h)
+        self.assertNotIn("id='approve'", h)
+        self.assertNotIn("chance this is luck", h)
+        self.assertIn("burst_pipe<small>got worse", h)
+        self.assertIn("swear<small>already passing", h)
