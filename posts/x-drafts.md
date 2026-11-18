@@ -107,12 +107,12 @@ the 1-of-4 to 4-of-4 case, which looks noisier than it did: today the unfixed pr
 > so i lead with the boring number now. 178 calls, 79% to 86%. less exciting, actually true
 
 ## Day 2 evening drafts (Tue 11/17)
-**14. four friends (contest; post after the proof lands, fill the result) (298)**
-> 4 friends called my ai receptionist today to break it.
+**14. four friends (contest; post after the proof lands; [result] fits 38 characters, e.g. "proven: 9 of 16 → 15 of 16")**
+> 4 friends called my ai to break it.
 >
-> gas leak. a turtle that bit a pipe. "call me at 1 800 deep nuts." death threats.
+> gas leak. a turtle bit a pipe. "call me at 1 800 deep nuts." threats.
 >
-> overnight nightshift turned all 4 calls into permanent tests and a 6 line fix. [result]
+> overnight it turned all 4 calls into tests and a 6 line fix. [result]
 >
 > https://community.harnessrouter.ai/p/nightshift
 > @HarnessRouter #HarnessRouter #UHP #BigHackGame
