@@ -130,12 +130,58 @@ def full_transcripts(days: int, skip: set[str] | None = None) -> str:
         return ""
 
 
+LABELS = ("Caller", "Godfrey", "Agent", "Customer", "User", "Assistant")
+ASKS_NAME = re.compile(r"\b(your name|who am i speaking|who's calling|who is calling|name for the)\b", re.I)
+ADDRESSED = re.compile(r"\b(?i:thanks|thank you|sorry|got it|okay|ok|hi|hey|alright|perfect|great),\s+([A-Z][a-z'’-]{1,20})\b")
+NOT_A_NAME = {"I", "I'm", "Im", "Yes", "Yeah", "No", "Nope", "Okay", "Ok", "Sure", "Man", "Bro", "Dude", "It", "It's",
+              "Its", "The", "My", "Hey", "Hi", "Hello", "Um", "Uh", "Well", "So", "Just", "Sorry", "Thanks", "Mister",
+              "Mr", "Mrs", "Ms", "Miss", "Sir", "Ma'am", "Godfrey", "Sunset", "Plumbing", "This", "That", "What", "Why",
+              "Can", "Call", "Please", "Wait", "Look", "Like", "Not", "Nah", "Bye", "Goodbye", "Fine", "Good", "Oh",
+              "PG", "E", "AI", "Who", "Me", "You", "We", "They", "He", "She", "Name", "Its"}
+
+
+def learn_names(text: str) -> set[str]:
+    """Names a caller gave with nothing marking them as a name: the answer right after the agent asks for a name
+    ("Joe. John."), and names the agent then says back ("Thanks, John."). The redactor misses both."""
+    names: set[str] = set()
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        who, _, said = line.partition(":")
+        if who.strip() not in LABELS[1:] and who.strip() != "Godfrey":
+            continue
+        names |= {m for m in ADDRESSED.findall(said) if m not in NOT_A_NAME}
+        if ASKS_NAME.search(said) and i + 1 < len(lines):
+            nxt_who, _, nxt = lines[i + 1].partition(":")
+            if nxt_who.strip() == "Caller":
+                names |= {w for w in re.findall(r"\b[A-Z][a-z'’-]{1,20}\b", nxt) if w not in NOT_A_NAME}
+    return names
+
+
+def scrub_names(text: str, names: set[str]) -> str:
+    for n in sorted(names, key=len, reverse=True):
+        text = re.sub(rf"\b{re.escape(n)}\b", "[NAME]", text)
+    return text
+
+
+def _protect_labels(text: str) -> str:
+    return re.sub(rf"^(\s*(?:- )?(?:\*\*)?)({'|'.join(LABELS)})(\*\*)?:", lambda m: f"{m.group(1)}LBL{m.group(2).upper()}X{m.group(3) or ''}:",
+                  text, flags=re.M)
+
+
+def _restore_labels(text: str) -> str:
+    for lab in LABELS:
+        text = text.replace(f"LBL{lab.upper()}X", lab)
+    return text
+
+
 def redact_both(text: str, context: str = "") -> tuple[str, str]:
     """demo-factory's redactor over context + text in one pass, so names learned in the full calls ("this is X") are
     also removed from the report's excerpts. 911 is protected (the redactor reads "call 911" as an address).
     Returns (redacted text, redacted context)."""
-    guarded = NINE11.sub("NINEONEONEX", (context + SEP if context else "") + text)
-    out = _run(["-m", "demo_line.redact", "--keep-demo"], stdin=guarded).replace("NINEONEONEX", "911")
+    names = learn_names(context) | learn_names(text)
+    joined = scrub_names((context + SEP if context else "") + text, names)
+    guarded = _protect_labels(NINE11.sub("NINEONEONEX", joined))
+    out = _restore_labels(_run(["-m", "demo_line.redact", "--keep-demo"], stdin=guarded).replace("NINEONEONEX", "911"))
     if not context:
         return out, ""
     ctx, _, rest = out.partition("=====NIGHTSHIFT-REPORT-STARTS=====")

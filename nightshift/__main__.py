@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -98,7 +99,12 @@ def night(args: argparse.Namespace) -> int:
         log(f"1. Calls: read {base.path.name}: {base.passed} of {base.total} passed")
     else:
         log("1. Calls: simulating tonight's calls with " + ("the approved prompt..." if stack_prompt else "the current prompt..."))
-        base = retest.run_suite(args.cases, stack_prompt, repeat=1, log=log).run
+        try:
+            base = retest.run_suite_complete(args.cases, stack_prompt, repeat=1, log=log).run
+        except retest.Refused as e:
+            shutil.rmtree(out, ignore_errors=True)
+            log(f"Skipped: today's $2 test budget is used up ({e}). Nothing was created.")
+            return 2
         log(f"   {base.passed} of {base.total} passed")
     counts: dict[str, int] = {}
     for c in base.failures:
@@ -169,6 +175,10 @@ def real_night(args: argparse.Namespace, out: Path, stamp: str) -> int:
     rn = realcalls.load(args.real_days or 0, max(1, args.max_cases), Path(args.real_file) if args.real_file else None,
                         skip_seen=getattr(args, "new_only", False))
     log(f"   {rn.calls} real calls, {rn.flagged_calls} flagged: " + ", ".join(f"{k} x{v}" for k, v in rn.flag_counts.items()))
+    if rn.calls == 0:
+        shutil.rmtree(out, ignore_errors=True)
+        log("No new real calls: nothing to review, nothing created.")
+        return 0
     summary: dict = {"date": stamp, "agent": "Godfrey (Sunset Plumbing demo line), REAL calls", "mode": "real",
                      "baseline_passed": rn.calls - rn.flagged_calls, "baseline_total": rn.calls,
                      "baseline_file": "real calls", "flag_counts": rn.flag_counts, "failed_cases": rn.cases,

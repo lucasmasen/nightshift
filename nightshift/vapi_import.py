@@ -53,13 +53,14 @@ def system_prompt(assistant: dict) -> str:
 
 
 def redact(text: str) -> str:
-    from .realcalls import NINE11
+    from .realcalls import NINE11, _protect_labels, _restore_labels, learn_names, scrub_names
     py = config.WORKSPACE / "demo-factory" / ".venv" / "bin" / "python"
+    guarded = _protect_labels(NINE11.sub("NINEONEONEX", scrub_names(text, learn_names(text))))
     p = subprocess.run([str(py), "-m", "demo_line.redact"], cwd=config.WORKSPACE / "demo-factory",
-                       input=NINE11.sub("NINEONEONEX", text), capture_output=True, text=True, timeout=300)
+                       input=guarded, capture_output=True, text=True, timeout=300)
     if p.returncode not in (0, 1) or not p.stdout.strip():
         raise RuntimeError("redaction failed; not writing unredacted calls")
-    return p.stdout.replace("NINEONEONEX", "911")
+    return _restore_labels(p.stdout.replace("NINEONEONEX", "911"))
 
 
 def run(assistant_id: str, out: Path, days: int = 7, limit: int = 50, key: str | None = None, log=print) -> Path:

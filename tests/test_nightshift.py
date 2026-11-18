@@ -798,6 +798,25 @@ class BulletproofTests(unittest.TestCase):
                 config.RUNS = old
 
 
+class NameLearningTests(unittest.TestCase):
+    def test_answer_to_name_question_and_said_back(self):
+        from nightshift import realcalls as r
+        t = ("Godfrey: Can you tell me your name so I can get the right plumber?\nCaller: Joe. John.\n"
+             "Godfrey: Thanks, John. Is it still running?\nCaller: Man, yes. Call 911.\n"
+             "Godfrey: Okay, Priya, stay out of the water.\n")
+        self.assertEqual(r.learn_names(t), {"Joe", "John", "Priya"})
+        self.assertNotIn("Man", r.learn_names(t))
+        out = r.scrub_names(t, r.learn_names(t))
+        self.assertNotIn("John", out)
+        self.assertIn("Caller: [NAME]. [NAME].", out)
+
+    def test_labels_survive(self):
+        from nightshift import realcalls as r
+        t = "Caller: hi\n- **Godfrey:** hello\nAgent: x\n"
+        self.assertEqual(r._restore_labels(r._protect_labels(t)), t)
+        self.assertNotIn("Caller:", r._protect_labels(t))
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

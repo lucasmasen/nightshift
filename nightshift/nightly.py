@@ -67,7 +67,7 @@ def _run(args: list[str], log) -> tuple[int, str, Path | None]:
 def _item(title: str, code: int, out: str, night: Path | None) -> dict:
     if night:
         return {"title": title, "night": night.name, "summary": json.loads((night / "summary.json").read_text())}
-    note = ("Skipped: today's $2 test budget was already used." if "cap" in out.lower() or "Refused" in out else
+    note = ("Skipped: today's $2 test budget was already used." if code == 2 or "cap" in out.lower() or "Refused" in out else
             "Didn't run: " + (out.strip().splitlines() or ["no output"])[-1][:200])
     return {"title": title, "night": None, "summary": None, "note": note}
 
@@ -86,7 +86,8 @@ def run(real_days: int = 1, max_cases: int = 4, send_email: bool = True, log=pri
             items.append(_item(f"Proof of an earlier fix ({d.name})", code, out, d if code == 0 else None))
 
     code, out, night = _run(["night", "--real-days", str(real_days), "--new-only", "--max-cases", "3", "--guards", "2"], log)
-    if night and (json.loads((night / "summary.json").read_text()).get("baseline_total") or 0) == 0:
+    if "No new real calls" in out or (night and (json.loads((night / "summary.json").read_text())
+                                                 .get("baseline_total") or 0) == 0):
         items.append({"title": "Real calls to the demo line", "night": None, "summary": None,
                       "note": "No one called the demo line since yesterday."})
     else:
