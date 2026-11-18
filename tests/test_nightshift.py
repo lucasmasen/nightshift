@@ -1000,3 +1000,61 @@ class ServeTests(unittest.TestCase):
                 srv.shutdown()
             finally:
                 config.RUNS, lessons.LESSONS = old
+
+
+class FillProofTests(unittest.TestCase):
+    """Pitch/X placeholders get numbers only when the proof holds."""
+
+    def _summary(self, before, after, verdict="Ready for approval: x"):
+        twins = ["real_gas_troll", "real_b"]
+        return {"twin_tests": twins, "verdict": verdict,
+                "before": {"passed": 0, "total": 8, "cases": before},
+                "after": {"passed": 0, "total": 8, "cases": after}}
+
+    def test_star_case_sentence_and_x_fit(self):
+        from nightshift import fillproof
+        s = self._summary({"real_gas_troll": [1, 4], "real_b": [2, 4]}, {"real_gas_troll": [4, 4], "real_b": [3, 4]})
+        pitch, x, why = fillproof.lines(s)
+        self.assertEqual(why, "ok")
+        self.assertIn("old Godfrey passed it 1 of 4, the fixed one 4 of 4", pitch)
+        self.assertEqual(x, "proven: 3 of 8 → 7 of 8")
+        self.assertLessEqual(len(x), fillproof.X_ROOM)
+
+    def test_falls_back_to_all_friends_when_star_flat(self):
+        from nightshift import fillproof
+        s = self._summary({"real_gas_troll": [4, 4], "real_b": [1, 4]}, {"real_gas_troll": [4, 4], "real_b": [4, 4]})
+        pitch, _, _ = fillproof.lines(s)
+        self.assertIn("all 2 friends' calls", pitch)
+
+    def test_no_fill_when_proof_fails(self):
+        from nightshift import fillproof
+        self.assertIsNone(fillproof.lines({"verdict": "Not re-tested yet"})[0])
+        bad = self._summary({"real_gas_troll": [1, 4]}, {"real_gas_troll": [4, 4]}, verdict="Don't approve: x")
+        self.assertIsNone(fillproof.lines(bad)[0])
+        flat = self._summary({"real_gas_troll": [2, 4], "real_b": [2, 4]}, {"real_gas_troll": [2, 4], "real_b": [2, 4]})
+        self.assertIsNone(fillproof.lines(flat)[0])
+
+    def test_fill_skips_instruction_lines(self):
+        from nightshift import fillproof
+        text = "Fill [PROOF] from summary.json\nHis call became a test. [PROOF].\n"
+        new, n = fillproof._fill(text, "[PROOF]", "X", ("Fill ", "#"))
+        self.assertEqual(n, 1)
+        self.assertIn("Fill [PROOF] from", new)
+        self.assertIn("a test. X.", new)
+
+    def test_run_writes_with_backup(self):
+        from nightshift import fillproof
+        with tempfile.TemporaryDirectory() as t:
+            t = Path(t)
+            night = t / "night"
+            night.mkdir()
+            s = self._summary({"real_gas_troll": [1, 4], "real_b": [2, 4]}, {"real_gas_troll": [4, 4], "real_b": [3, 4]})
+            (night / "summary.json").write_text(json.dumps(s))
+            pitch, xd = t / "pitch.md", t / "x.md"
+            pitch.write_text("Fill [PROOF] here\nA test. [PROOF].\n")
+            xd.write_text("**14. room for [result]**\n> overnight a fix. [result]\n")
+            self.assertTrue(fillproof.run(night, pitch_path=pitch, x_path=xd, log=lambda *_: None))
+            self.assertIn("1 of 4, the fixed one 4 of 4.", pitch.read_text())
+            self.assertIn("> overnight a fix. proven: 3 of 8 → 7 of 8", xd.read_text())
+            self.assertIn("room for [result]", xd.read_text())
+            self.assertTrue((night / "fill-proof-backup" / "pitch.md").exists())

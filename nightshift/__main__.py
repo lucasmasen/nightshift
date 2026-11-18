@@ -392,6 +392,9 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("dir")
     rt.add_argument("--repeat", type=int, default=4)
     rt.add_argument("--guards", type=int, default=3)
+    fp = sub.add_parser("fill-proof", help="Put a held proof's numbers into the pitch [PROOF] and X draft [result]")
+    fp.add_argument("dir")
+    fp.add_argument("--dry-run", action="store_true")
     ex = sub.add_parser("export", help="Build site/ (public static copy) from the named nights; never deploys")
     ex.add_argument("nights", nargs="+")
     ra = sub.add_parser("register-agent", help="Review another voice agent every night (Vapi assistant or a folder)")
@@ -503,6 +506,9 @@ def main(argv: list[str] | None = None) -> int:
         stage.write(out)
         dashboard.write()
         return 0
+    if a.cmd == "fill-proof":
+        from . import fillproof
+        return 0 if fillproof.run(Path(a.dir), dry_run=a.dry_run, log=log) else 1
     if a.cmd == "nightly":
         nightly.run(max_cases=a.max_cases, send_email=not a.no_email, log=log)
         dashboard.write()
