@@ -674,7 +674,7 @@ class LockTests(unittest.TestCase):
 
 class PreflightTests(unittest.TestCase):
     def test_offline_copy_is_self_contained(self):
-        from nightshift import config, preflight
+        from nightshift import preflight
         night = Path(__file__).resolve().parent.parent / "runs" / "2026-11-16-184822"
         if not (night / "summary.json").exists():
             self.skipTest("no local night to copy")
