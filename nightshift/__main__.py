@@ -188,7 +188,16 @@ def real_night(args: argparse.Namespace, out: Path, stamp: str) -> int:
         return finish(out, summary)
     (out / "failures.md").write_text(rn.report)
     prompt_now = out / "prompt.before.md"
-    prompt_now.write_text(retest.current_prompt())
+    # Stack on the latest approved fix (like simulated nights), so every fix lands on one line of instructions
+    # instead of two fixes both written against what's live and clashing when one goes live.
+    from . import nightly
+    approved = nightly.latest_approved()
+    if approved:
+        prompt_now.write_text((approved / "prompt.proposed.md").read_text())
+        summary["builds_on"] = approved.name
+        log(f"   building on approved night {approved.name}")
+    else:
+        prompt_now.write_text(retest.current_prompt())
     shop = config.TEST_CHECKOUT / config.SHOP_REL
     log(f"2. Fix: {rn.flagged_calls} flagged real calls; simulated twins to prove it: {', '.join(rn.cases)}")
     if args.mock:
