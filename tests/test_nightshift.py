@@ -1125,3 +1125,29 @@ class BlockedCallsComeBackTests(unittest.TestCase):
                                  {"aaaa0001": "real_20261117_aaaa0001", "dddd0004": "real_gas_troll"})
             finally:
                 config.RUNS = old
+
+
+class OneFixPerNightTests(unittest.TestCase):
+    def test_real_call_fix_skips_the_simulated_night(self):
+        from unittest import mock
+        from nightshift import agents, config, nightly
+        with tempfile.TemporaryDirectory() as d:
+            calls = []
+
+            def fake_run(args, log):
+                calls.append(args)
+                night = Path(d) / "2026-11-19-020000"
+                night.mkdir(exist_ok=True)
+                (night / "summary.json").write_text(json.dumps({"mode": "real", "diff": "+ rule", "baseline_total": 6}))
+                return 0, "ok", night
+
+            with mock.patch.object(config, "RUNS", Path(d)), mock.patch.object(nightly, "_run", fake_run), \
+                    mock.patch.object(nightly, "pending_proofs", return_value=[]), \
+                    mock.patch.object(nightly, "needs_verify", return_value=[]), \
+                    mock.patch.object(nightly, "waiting_on_person", return_value=None), \
+                    mock.patch.object(nightly, "ensure_server"), \
+                    mock.patch.object(agents, "registered", return_value={}):
+                items = nightly.run(send_email=False, log=lambda m: None)
+        self.assertEqual(len(calls), 1)
+        self.assertIn("--real-days", calls[0])
+        self.assertIn("Skipped: tonight's fix came from real calls", items[-1]["note"])

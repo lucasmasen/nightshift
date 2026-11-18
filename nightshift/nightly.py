@@ -129,13 +129,20 @@ def run(real_days: int = 3, max_cases: int = 4, send_email: bool = True, log=pri
                           "note": "No one called the demo line since yesterday."})
         else:
             items.append(_item("Real calls to the demo line", code, out, night))
-
-        args = ["night", "--max-cases", str(max_cases)]
-        base = latest_approved()
-        if base:
-            args += ["--on-top-of", str(base)]
-        code, out, night = _run(args, log)
-        items.append(_item("Simulated calls" + (f" (building on approved {base.name})" if base else ""), code, out, night))
+        real_fix = bool(night and (night / "summary.json").exists()
+                        and json.loads((night / "summary.json").read_text()).get("diff"))
+        if real_fix:
+            # One fix at a time: a simulated fix built on the same base would clash with it and split the budget.
+            items.append({"title": "Simulated calls", "night": None, "summary": None,
+                          "note": "Skipped: tonight's fix came from real calls. One fix at a time, and the test "
+                                  "budget goes to proving that one."})
+        else:
+            args = ["night", "--max-cases", str(max_cases)]
+            base = latest_approved()
+            if base:
+                args += ["--on-top-of", str(base)]
+            code, out, night = _run(args, log)
+            items.append(_item("Simulated calls" + (f" (building on approved {base.name})" if base else ""), code, out, night))
 
     from . import agents
     for name, entry in agents.registered().items():
