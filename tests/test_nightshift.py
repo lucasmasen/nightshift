@@ -1092,3 +1092,36 @@ class BlockedStoryTests(unittest.TestCase):
         self.assertIn("burst pipe call that always passed fell to 1/4", out)
         self.assertIn("What it tried", out)
         self.assertNotIn("Nothing went live", out)
+
+
+class BlockedCallsComeBackTests(unittest.TestCase):
+    def _night(self, d, name, **s):
+        (Path(d) / name).mkdir()
+        (Path(d) / name / "summary.json").write_text(json.dumps(s))
+
+    def test_calls_of_a_blocked_fix_are_reviewed_again(self):
+        from nightshift import config, realcalls
+        with tempfile.TemporaryDirectory() as d:
+            old = config.RUNS
+            config.RUNS = Path(d)
+            try:
+                self._night(d, "2026-11-17-1", call_ids=["aaaa0001"], superseded_by="2026-11-17-3")
+                self._night(d, "2026-11-17-2", call_ids=["bbbb0002"], verdict="Fix proposed and passed")
+                self._night(d, "2026-11-17-3", call_ids=["aaaa0001", "cccc0003"], verdict="Don't approve: x")
+                self.assertEqual(realcalls.seen_ids(), {"bbbb0002"})
+            finally:
+                config.RUNS = old
+
+    def test_existing_twin_is_reused_not_copied(self):
+        from nightshift import config, twins
+        with tempfile.TemporaryDirectory() as d:
+            old = config.RUNS
+            config.RUNS = Path(d)
+            try:
+                extra = Path(d) / "extra.json"
+                extra.write_text(json.dumps({"real_20261117_aaaa0001": {"lines": ["a", "b"]}, "real_gas_troll": {}}))
+                self._night(d, "2026-11-17-1", call_ids=["dddd0004"], twin_tests=["real_gas_troll"])
+                self.assertEqual(twins.existing(["aaaa0001", "dddd0004", "eeee0005"], extra),
+                                 {"aaaa0001": "real_20261117_aaaa0001", "dddd0004": "real_gas_troll"})
+            finally:
+                config.RUNS = old

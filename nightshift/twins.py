@@ -83,13 +83,34 @@ def save(cases: dict[str, dict], path: Path | None = None) -> list[str]:
     return added
 
 
+def existing(call_ids: list[str], path: Path | None = None) -> dict[str, str]:
+    """{call id: its permanent test} for calls that already have one (a call re-reviewed after its fix was blocked
+    keeps its first test instead of getting a copy). Matched by the id in the test's name, or by a night that
+    reviewed that one call alone and made one test (the hand-made real_gas_troll)."""
+    path = path or extra_file()
+    names = list(json.loads(path.read_text())) if path.exists() else []
+    out = {cid: n for cid in call_ids for n in names if n.endswith(cid[:8])}
+    for f in config.RUNS.glob("20*/summary.json") if config.RUNS.exists() else []:
+        try:
+            s = json.loads(f.read_text())
+        except ValueError:
+            continue
+        ids, tw = s.get("call_ids") or [], s.get("twin_tests") or []
+        if len(ids) == 1 and len(tw) == 1 and ids[0] in call_ids and tw[0] in names:
+            out.setdefault(ids[0], tw[0])
+    return out
+
+
 def from_night(full: str, report: str, call_ids: list[str], date: str) -> list[str]:
     """Build and save a test for each reviewed call. Returns the test names (new or already there)."""
     calls = by_call(full)
+    have = existing(call_ids)
     made: dict[str, dict] = {}
     for cid in call_ids:
-        if cid in calls and (t := build(cid, calls[cid], report, date)):
+        if cid in have or cid not in calls:
+            continue
+        if t := build(cid, calls[cid], report, date):
             made[t[0]] = t[1]
     if made:
         save(made)
-    return list(made)
+    return [have[c] for c in call_ids if c in have] + list(made)

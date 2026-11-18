@@ -104,14 +104,31 @@ def drop_calls(report: str, skip: set[str]) -> str:
     return "".join(keep)
 
 
+def _closed(s: dict) -> bool:
+    from .nightly import CLOSED
+    return str(s.get("verdict", "")).startswith(CLOSED)
+
+
 def seen_ids() -> set[str]:
-    """Call ids already reviewed by earlier real-call nights."""
-    out: set[str] = set()
-    for d in config.RUNS.glob("20*/summary.json") if config.RUNS.exists() else []:
+    """Call ids already reviewed by earlier real-call nights, minus calls whose fix was blocked or rejected (directly
+    or through the fix that replaced it): their problems are still there, so the next night reviews them again."""
+    nights: dict[str, dict] = {}
+    for f in config.RUNS.glob("20*/summary.json") if config.RUNS.exists() else []:
         try:
-            out |= set(json.loads(d.read_text()).get("call_ids") or [])
+            nights[f.parent.name] = json.loads(f.read_text())
         except ValueError:
             continue
+
+    def end(name: str) -> dict:
+        s, hops = nights.get(name, {}), 0
+        while s.get("superseded_by") in nights and hops < 20:
+            s, hops = nights[s["superseded_by"]], hops + 1
+        return s
+
+    out: set[str] = set()
+    for name, s in nights.items():
+        if s.get("call_ids") and not _closed(end(name)):
+            out |= set(s["call_ids"])
     return out
 
 
