@@ -91,6 +91,57 @@ def _line(raw: str) -> str:
     return f"<span class='hot'>{raw}</span>" if hot else raw
 
 
+def added_phrases(diff: str, limit: int = 6) -> list[str]:
+    """What each change ADDS, in words: for a reworded line, only the new words (whole sentences around them);
+    for a new line, the line. Readable from the back of a room, unlike a struck-through paragraph."""
+    import difflib
+    minus, plus, out = [], [], []
+
+    def flush():
+        for i, new in enumerate(plus):
+            old = minus[i] if i < len(minus) else ""
+            if not old:
+                out.append(new.strip(" -"))
+                continue
+            ow, nw = old.split(), new.split()
+            grabbed = []
+            for tag, _, _, j1, j2 in difflib.SequenceMatcher(a=ow, b=nw).get_opcodes():
+                if tag in ("insert", "replace"):
+                    grabbed.append(" ".join(nw[j1:j2]))
+            main = max(grabbed, key=len)  # the biggest insertion is the point of the change
+            if len(main.split()) < 4:
+                continue  # a scrap ("or won't"): not readable on its own
+            joined = main
+            # widen to the whole sentence it sits in, so it reads on its own
+            for sent in re.split(r"(?<=[.!?])\s+(?=[A-Z(\"])", new):
+                if main[:30] in sent:
+                    joined = sent.strip(" -")
+                    break
+            out.append(joined if len(joined) <= 210 else joined[:200].rsplit(" ", 1)[0] + " …")
+        minus.clear(); plus.clear()
+
+    for ln in diff.splitlines():
+        if ln.startswith(("+++", "---", "@@")):
+            continue
+        if ln.startswith("-"):
+            if plus:
+                flush()
+            minus.append(ln[1:])
+        elif ln.startswith("+"):
+            plus.append(ln[1:])
+        else:
+            flush()
+    flush()
+    return [o for o in out if o][:limit]
+
+
+def ranked_adds(diff: str, why: str, limit: int = 6) -> list[str]:
+    """The added rules, the ones about the call on slide 2 first (most words shared with its cause)."""
+    adds = added_phrases(diff, limit=50)
+    key = {w for w in re.findall(r"[a-z]{4,}", why.lower())} - {"that", "with", "they", "their", "never", "when"}
+    return sorted(adds, key=lambda a: -len(key & set(re.findall(r"[a-z]{4,}", a.lower()))))[:limit]
+
+
 def _diff(diff: str) -> str:
     out = []
     for ln in diff.splitlines():
@@ -152,6 +203,7 @@ h1{{font-size:clamp(40px,6vw,84px);line-height:1.05;margin:16px 0}} h2{{font-siz
 .call div{{margin:6px 0}} .Godfrey{{color:var(--c)}} .Caller{{color:var(--mute)}} .tool{{font:15px ui-monospace,monospace;color:var(--g)}}
 .why{{color:var(--r);font-size:22px;margin-top:18px}} .hot{{background:#3f2020;border-radius:6px;padding:2px 4px}} .err{{color:var(--r)}}
 .diff{{font:18px/1.5 ui-monospace,Menlo,monospace;background:var(--card);border-radius:14px;padding:18px 22px;white-space:pre-wrap;max-width:1100px}}
+.adds{{max-width:1150px}} .adds div{{background:#1f3a25;color:#bfe9c1;border-radius:10px;padding:12px 18px;margin:10px 0;font-size:24px;line-height:1.35}}
 .add{{background:#1f3a25;color:#bfe9c1}} .del{{background:#3f2020;color:#f3c1b8;text-decoration:line-through}} .ctx{{color:var(--mute)}}
 .row{{display:grid;grid-template-columns:260px 1fr 1fr 130px;gap:14px;align-items:center;margin:10px 0;font-size:18px}}
 .row small{{display:block;color:var(--mute);font-size:13px}} .bar{{height:18px;background:#0b1a10;border-radius:9px;overflow:hidden}}
@@ -167,7 +219,7 @@ button.done{{background:var(--c)}} .cap{{position:fixed;left:0;right:0;bottom:0;
 <section><div class="k">2am</div><h1>Nightshift hands the failures to an agent on HarnessRouter.</h1>
 <h2 class="mute">It traces each one to the instruction that caused it and makes the smallest fix.</h2>
 <div class="mute">{html.escape(where)}{spend} · harness {html.escape(str(t.get("harness_id", "")))}</div></section>
-<section><div class="k">The fix</div><div class="diff">{_diff(s.get("diff", "")) or "No change."}</div>
+<section><div class="k">The fix · what it added to the instructions</div><div class="adds">{"".join(f"<div>+ {html.escape(a)}</div>" for a in ranked_adds(s.get("diff", ""), why)) or "No change."}</div>
 <div class="mute" style="margin-top:16px">Safety check: disclosure untouched, placeholders kept, under 30 lines.</div></section>
 <section><div class="k">Proof · same calls, before and after</div><h2>{score}</h2><div class="mute" style="margin:-12px 0 18px">{evidence}</div>{full}{"".join(bars)}
 <div class="legend">grey = before · green = after</div></section>

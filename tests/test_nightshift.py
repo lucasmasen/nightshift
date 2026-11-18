@@ -876,6 +876,20 @@ class CombineTests(unittest.TestCase):
                 config.RUNS = old
 
 
+class FixSlideTests(unittest.TestCase):
+    def test_added_phrases_reads_like_rules(self):
+        from nightshift import stage
+        diff = ("--- a\n+++ b\n@@ -1 +1 @@\n-- Be kind. Keep it short.\n"
+                "+- Be kind. Keep it short. If they won't give a number, ask once more at most, then move on.\n"
+                "-- Say hi.\n+- Say hi or won't.\n+- Brand new rule about gas safety comes first.\n")
+        adds = stage.added_phrases(diff)
+        self.assertIn("If they won't give a number, ask once more at most, then move on.", adds)
+        self.assertIn("Brand new rule about gas safety comes first.", adds)
+        self.assertFalse(any(a.strip() == "or won't." for a in adds))
+        ranked = stage.ranked_adds(diff, "endless re-asking for a callback number")
+        self.assertTrue(ranked[0].startswith("If they won't give a number"))
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve
