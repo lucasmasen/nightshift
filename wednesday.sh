@@ -22,9 +22,8 @@ if [[ -n "${CASES// /}" && -n "$AFTER" ]]; then
 else
   echo "Re-check: nothing really worse, no fix night needed."
 fi
-# The fix from Lucas's friend's real call (11/17): prove it on its new twin test plus related cases (~$0.30)
-python3 -m nightshift retest runs/2026-11-17-143741 --repeat 4 || echo "real-call retest: see above"
-python3 -m nightshift retest runs/2026-11-17-152548 --repeat 4 || echo "turtle-call retest: see above"
+# All of 11/17's real-call fixes, combined into one change: prove it on every friend's call (~$0.50)
+python3 -m nightshift retest runs/2026-11-17-172919 --repeat 4 || echo "real-call proof: see above"
 python3 -m nightshift publish || echo "publish: see above"
 python3 -m nightshift card $N --day 3
 echo "Done. Arena + re-check results: python3 -m nightshift serve, then open night $N"

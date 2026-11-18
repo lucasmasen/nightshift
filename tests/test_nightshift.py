@@ -850,6 +850,32 @@ class GuardHardeningTests(unittest.TestCase):
         self.assertTrue(any("[NAME]" in p for p in guard.check(old, bad2)))
 
 
+class CombineTests(unittest.TestCase):
+    def test_merge_clean_and_conflict(self):
+        from nightshift import combine
+        base = "a\nb\nc\nd\ne\nf\ng\n"
+        one = base.replace("b\n", "b1\n")
+        two = base.replace("f\n", "f2\n")
+        self.assertEqual(combine.merge(base, [one, two]), "a\nb1\nc\nd\ne\nf2\ng\n")
+        clash = base.replace("b\n", "bX\n")
+        with self.assertRaises(combine.Conflict):
+            combine.merge(base, [one, clash])
+
+    def test_new_night_dir_skips_taken_second(self):
+        from nightshift import combine, config
+        with tempfile.TemporaryDirectory() as d:
+            old = config.RUNS
+            config.RUNS = Path(d)
+            try:
+                a = combine.new_night_dir()
+                a.mkdir()
+                b = combine.new_night_dir()
+                self.assertNotEqual(a, b)
+                self.assertRegex(b.name, r"^20\d{2}-\d{2}-\d{2}-\d{6}$")
+            finally:
+                config.RUNS = old
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

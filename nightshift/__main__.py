@@ -395,6 +395,11 @@ def main(argv: list[str] | None = None) -> int:
     iv.add_argument("assistant_id")
     iv.add_argument("--days", type=int, default=7)
     iv.add_argument("--out", help="Folder to write (default: tries/vapi-<id>)")
+    cb = sub.add_parser("combine", help="Merge several waiting fixes into one change with one proof")
+    cb.add_argument("nights", nargs="+")
+    rs = sub.add_parser("restack", help="Redo a night's fix on top of another night's fix (when they conflict)")
+    rs.add_argument("night")
+    rs.add_argument("--onto", required=True)
     nl = sub.add_parser("nightly", help="One whole unattended night: real calls, simulated calls, morning email")
     nl.add_argument("--no-email", action="store_true")
     nl.add_argument("--max-cases", type=int, default=4)
@@ -468,6 +473,26 @@ def main(argv: list[str] | None = None) -> int:
             log(f"Import failed: {e}")
             return 1
         log(f"Next: python3 -m nightshift agent {out}")
+        return 0
+    if a.cmd == "combine":
+        from . import combine
+        try:
+            out = combine.run([Path(n) for n in a.nights], log=log)
+        except (ValueError, combine.Conflict) as e:
+            log(f"Not combined: {e}")
+            return 1
+        summ = dashboard.load(out)
+        (out / "report.html").write_text(report.render(summ))
+        stage.write(out)
+        dashboard.write()
+        return 0
+    if a.cmd == "restack":
+        from . import combine
+        out = combine.restack(Path(a.night), Path(a.onto), Client(config.api_key()), log=log)
+        summ = dashboard.load(out)
+        (out / "report.html").write_text(report.render(summ))
+        stage.write(out)
+        dashboard.write()
         return 0
     if a.cmd == "nightly":
         nightly.run(max_cases=a.max_cases, send_email=not a.no_email, log=log)

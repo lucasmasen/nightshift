@@ -40,6 +40,7 @@ def pending_proofs() -> list[Path]:
     for d, s in dashboard.nights():
         if (s.get("diff") and not s.get("guard_problems") and not s.get("after") and s.get("mode") != "agent"
                 and (s.get("trace") or {}).get("where") != "mock" and not s.get("rejected")
+                and not s.get("superseded_by")
                 and (s.get("retest_cases") or s.get("failed_cases"))):
             out.append(d)
     return out
