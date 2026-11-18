@@ -838,6 +838,18 @@ class OutgoingCheckTests(unittest.TestCase):
             self.assertEqual(fixer.outgoing_check(clean, log=lambda m: None), clean)
 
 
+class GuardHardeningTests(unittest.TestCase):
+    def test_rejects_new_numbers_and_scrub_labels(self):
+        from nightshift import guard
+        old = "You are an AI assistant and this call is recorded.\nExample: 415 555 0199.\nBe kind.\n"
+        ok = old.replace("Be kind.", "Be kind. Read 415-555-0199 back digit by digit.")
+        self.assertEqual(guard.check(old, ok), [])
+        bad = old.replace("Be kind.", "Be kind. If stuck, call 415 867 5309.")
+        self.assertTrue(any("phone number" in p and "**09" in p for p in guard.check(old, bad)))
+        bad2 = old.replace("Be kind.", "Be kind. Say 'Thanks, [NAME]'.")
+        self.assertTrue(any("[NAME]" in p for p in guard.check(old, bad2)))
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

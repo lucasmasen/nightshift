@@ -9,6 +9,8 @@ from . import config
 # Lines that carry the AI + recording disclosure (CA two-party consent). They must survive word for word.
 DISCLOSURE = re.compile(r"recorded|se graba|AI assistant|asistente de inteligencia artificial", re.I)
 PLACEHOLDER = re.compile(r"\$[a-z_]+")
+PHONE = re.compile(r"(?<!\d)\d{3}[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)")
+REDACTED = re.compile(r"\[(NAME|PHONE|ADDRESS|UNIT|GATE|EMAIL|SHOP)\]")
 
 
 def changed_lines(old: str, new: str) -> int:
@@ -38,6 +40,16 @@ def check(old: str, new: str, max_changed: int = config.MAX_CHANGED_LINES) -> li
     missing = set(PLACEHOLDER.findall(old)) - set(PLACEHOLDER.findall(new))
     if missing:
         problems.append("Placeholders were dropped: " + ", ".join(sorted(missing)))
+    digits = lambda x: re.sub(r"\D", "", x)  # noqa: E731
+    old_numbers = {digits(m) for m in PHONE.findall(old)}
+    added = [d for d in (digits(m) for m in PHONE.findall(new)) if d not in old_numbers]
+    if added:
+        problems.append("The fix adds a phone number that wasn't in the instructions (never invent numbers): "
+                        + ", ".join(f"***-***-**{d[-2:]}" for d in added))
+    labels = set(REDACTED.findall(new)) - set(REDACTED.findall(old))
+    if labels:
+        problems.append("The fix copied scrubbing labels from the calls into the instructions: "
+                        + ", ".join(f"[{x}]" for x in sorted(labels)))
     n = changed_lines(old, new)
     if n > max_changed:
         problems.append(f"The fix changes {n} lines; the limit is {max_changed}. Smaller fixes are safer.")
