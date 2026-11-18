@@ -31,6 +31,19 @@ def baseline_path(s: dict) -> Path | None:
     return config.TEST_CHECKOUT / "demo_line" / "suite_runs" / name
 
 
+def shared_baseline(night_dir: Path) -> Path | None:
+    """A full baseline run from another night that started from the exact same instructions (real-call nights have
+    none of their own): same prompt, so the same "before"."""
+    before = (night_dir / "prompt.before.md").read_text()
+    for d, s in dashboard.nights():
+        if d == night_dir or not (d / "prompt.before.md").exists():
+            continue
+        bp = baseline_path(s)
+        if bp and bp.is_file() and (d / "prompt.before.md").read_text() == before:
+            return bp
+    return None
+
+
 def verify(night_dir: Path, log=print, reuse: Path | None = None, crash_retries: int = 2) -> dict:
     """Run every simulator case once with the night's proposed prompt and compare with the night's baseline run.
     About 178 calls (~$0.90): the step before anything goes live.
@@ -38,7 +51,7 @@ def verify(night_dir: Path, log=print, reuse: Path | None = None, crash_retries:
     Calls where the simulator itself crashed (network drop, API error) say nothing about the fix, so they're re-run,
     up to crash_retries times. `reuse` starts from a run file that already happened and only re-runs its crashes."""
     s = dashboard.load(night_dir)
-    base_path = baseline_path(s)
+    base_path = baseline_path(s) or shared_baseline(night_dir)
     if base_path is None or not base_path.is_file():
         raise RuntimeError("This night has no baseline run file to compare with (real-call nights don't).")
     base = collect.parse(base_path)

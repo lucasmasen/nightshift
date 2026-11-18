@@ -890,6 +890,28 @@ class FixSlideTests(unittest.TestCase):
         self.assertTrue(ranked[0].startswith("If they won't give a number"))
 
 
+class SharedBaselineTests(unittest.TestCase):
+    def test_borrows_baseline_from_same_instructions(self):
+        from nightshift import config, ops
+        with tempfile.TemporaryDirectory() as d:
+            old = config.RUNS
+            config.RUNS = Path(d) / "runs"
+            try:
+                base_file = Path(d) / "base.md"
+                base_file.write_text("**1 of 2 passed.**")
+                a, b, c = (config.RUNS / n for n in ("2026-11-16-010000", "2026-11-17-010000", "2026-11-17-020000"))
+                for x, prompt in ((a, "P1"), (b, "P1"), (c, "P2")):
+                    x.mkdir(parents=True)
+                    (x / "prompt.before.md").write_text(prompt)
+                (a / "summary.json").write_text(json.dumps({"baseline_path": str(base_file)}))
+                (b / "summary.json").write_text(json.dumps({"mode": "real", "baseline_file": "real calls"}))
+                (c / "summary.json").write_text(json.dumps({"mode": "real", "baseline_file": "real calls"}))
+                self.assertEqual(ops.shared_baseline(b), base_file)
+                self.assertIsNone(ops.shared_baseline(c))  # different instructions: no borrowing
+            finally:
+                config.RUNS = old
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve

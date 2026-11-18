@@ -46,6 +46,12 @@ def pending_proofs() -> list[Path]:
     return out
 
 
+def needs_verify() -> list[Path]:
+    """Approved fixes that haven't had the full every-case check yet (the last step before go-live)."""
+    return [d for d, s in dashboard.nights() if s.get("approved") and not (s.get("verify") or {}).get("complete")
+            and s.get("mode") != "agent"]
+
+
 def latest_approved() -> Path | None:
     for d, s in dashboard.nights():  # newest first
         if s.get("approved") and s.get("mode") not in ("real", "agent"):
@@ -85,6 +91,12 @@ def run(real_days: int = 1, max_cases: int = 4, send_email: bool = True, log=pri
                           "note": "Skipped: today's $2 test budget was already used. It runs on the next one."})
         else:
             items.append(_item(f"Proof of an earlier fix ({d.name})", code, out, d if code == 0 else None))
+
+    for d in needs_verify():
+        code, out, _ = _run(["verify", str(d)], log)
+        items.append({"title": f"Full check of approved fix {d.name}", "night": d.name, "summary": None,
+                      "note": ("Skipped: today's test budget was already used." if "cap" in out.lower() or code == 2
+                               else (out.strip().splitlines() or ["(no output)"])[-1][:240])})
 
     code, out, night = _run(["night", "--real-days", str(real_days), "--new-only", "--max-cases", "3", "--guards", "2"], log)
     if "No new real calls" in out or (night and (json.loads((night / "summary.json").read_text())
