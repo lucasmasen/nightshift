@@ -21,14 +21,17 @@ toward the Distribution prize. Ask staff; meanwhile post on X and LinkedIn too.
 **Project name:** Nightshift
 
 **Description:**
-AI phone agents make mistakes at 2am and nobody notices until a customer complains. Nightshift is the night shift
+AI phone agents make mistakes at 2am and nobody notices until a caller complains. Nightshift is the night shift
 for your voice agent. Every night it reads the agent's calls, finds the ones that went wrong, and sends them to a
 HarnessRouter agent (Claude Code harness) that traces each failure to the instruction that caused it and makes the
 smallest fix. A safety check rejects any fix that touches the AI and call-recording disclosure. Then Nightshift
 re-tests the fix on fresh calls and says how likely the gain is to be luck. Nothing goes live until a person
 approves it. On my after-hours receptionist for plumbers (demo shop Sunset Plumbing, made up), night 1's fix took
-178 simulated test calls from 79% to 86% passing. It also works on any voice agent: give it the instructions and
-call transcripts, and it finds the bad calls itself.
+178 simulated test calls from 79% to 86% passing. It also stops itself: when four friends called the real demo
+line to break it, Nightshift wrote a fix from their calls, tested it, and blocked it, because a burst-pipe call that
+always passed fell to 1 in 4. It also works on any voice agent: give it the instructions and call transcripts, and
+it finds the bad calls itself.
+(Updated Wed 11/18 ~3:55pm: the blocked-fix sentence is new. Paste the new description into the saved project page.)
 
 **Live link or GitHub:** https://nightshift-bighack.vercel.app (published 11/16 ~7:35pm on Lucas's Vercel team
 "kakhao", project `nightshift-bighack`; public; to update: `python3 -m nightshift export <nights...>` then redeploy
