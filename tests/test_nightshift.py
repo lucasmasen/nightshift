@@ -810,6 +810,17 @@ class NameLearningTests(unittest.TestCase):
         self.assertNotIn("John", out)
         self.assertIn("Caller: [NAME]. [NAME].", out)
 
+    def test_demo_shop_name_survives_but_people_do_not(self):
+        from nightshift import config, realcalls as r
+        if not (config.TEST_CHECKOUT / "demo_line" / "redact.py").exists():
+            self.skipTest("no demo-factory checkout")
+        t = ("Godfrey: Okay. This is Sunset Plumbing, and I'm Godfrey, the shop's AI assistant.\n"
+             "Caller: My name is Dana Whitfield.\nGodfrey: Thanks, Dana. Call 911 if you smell gas.\n")
+        out = r.redact(t)
+        self.assertIn("This is Sunset Plumbing", out)
+        self.assertNotIn("Dana", out)
+        self.assertIn("911", out)
+
     def test_labels_survive(self):
         from nightshift import realcalls as r
         t = "Caller: hi\n- **Godfrey:** hello\nAgent: x\n"

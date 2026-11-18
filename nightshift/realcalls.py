@@ -88,6 +88,10 @@ def fixed_flags(agent_report: str) -> list[str]:
 
 
 NINE11 = re.compile(r"\b9[\s-]?1[\s-]?1\b|\bnine[\s-]one[\s-]one\b", re.I)
+# The made-up demo shop. The redactor reads "this is Sunset Plumbing" as a person introducing themself and then
+# hides "Sunset" everywhere, which makes the fixer's transcripts say "[NAME] Plumbing". It is not a real shop.
+DEMO_SHOP = re.compile(r"\bSunset(?=\s+Plumbing\b)")
+SHOP_HOLD = "the_demo_shop"  # starts with "the", which the redactor never reads as a name
 SEP = "\n\n=====NIGHTSHIFT-REPORT-STARTS=====\n\n"
 
 
@@ -179,9 +183,12 @@ def redact_both(text: str, context: str = "") -> tuple[str, str]:
     also removed from the report's excerpts. 911 is protected (the redactor reads "call 911" as an address).
     Returns (redacted text, redacted context)."""
     names = learn_names(context) | learn_names(text)
-    joined = scrub_names((context + SEP if context else "") + text, names)
-    guarded = _protect_labels(NINE11.sub("NINEONEONEX", joined))
-    out = _restore_labels(_run(["-m", "demo_line.redact", "--keep-demo"], stdin=guarded).replace("NINEONEONEX", "911"))
+    joined = (context + SEP if context else "") + text
+    guarded = _protect_labels(DEMO_SHOP.sub(SHOP_HOLD, NINE11.sub("NINEONEONEX", joined)))
+    out = _run(["-m", "demo_line.redact", "--keep-demo"], stdin=guarded)
+    # Learned names are scrubbed after the redactor, never before: "my name is [NAME] Whitfield" no longer looks
+    # like an intro to it, so scrubbing first let surnames through.
+    out = _restore_labels(scrub_names(out, names)).replace("NINEONEONEX", "911").replace(SHOP_HOLD, "Sunset")
     if not context:
         return out, ""
     ctx, _, rest = out.partition("=====NIGHTSHIFT-REPORT-STARTS=====")
