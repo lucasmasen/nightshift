@@ -106,6 +106,24 @@ the 1-of-4 to 4-of-4 case, which looks noisier than it did: today the unfixed pr
 >
 > so i lead with the boring number now. 178 calls, 79% to 86%. less exciting, actually true
 
+## Day 2 evening drafts (Tue 11/17)
+**14. four friends (contest; post after the proof lands, fill the result) (298)**
+> 4 friends called my ai receptionist today to break it.
+>
+> gas leak. a turtle that bit a pipe. "call me at 1 800 deep nuts." death threats.
+>
+> overnight nightshift turned all 4 calls into permanent tests and a 6 line fix. [result]
+>
+> https://community.harnessrouter.ai/p/nightshift
+> @HarnessRouter #HarnessRouter #UHP #BigHackGame
+
+**15. the ask (no tags) (208)**
+> if you run a voice agent: send me its calls.
+>
+> i'll run nightshift on them tonight. it finds the bad calls, fixes the instructions, and won't let anything go live until you say yes.
+>
+> free while i'm building it
+
 ## Posting order (my pick)
 Tue: 1 (contest, morning), 6 (afternoon), 10 (evening). Wed: 3, 8. Thu: 2, 4. Fri after Demo Day: the result.
 Reply to every reply within the first hour.
