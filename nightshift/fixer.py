@@ -59,6 +59,30 @@ def parse_summary(text: str) -> dict:
     return {"changed": None, "summary": text.strip()[-300:]}
 
 
+PHONE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)")
+FICTIONAL = re.compile(r"555[\s.-]?01\d\d")  # 555-0100..0199 is reserved for fiction (the test calls use it)
+
+
+def outgoing_check(path: Path, log=print) -> Path:
+    """Last check before a file leaves this Mac: call transcripts must hold no learnable name and no real-looking
+    phone number. Anything found is scrubbed into a copy that is sent instead, and the log says so."""
+    if path.name not in ("failures.md", "calls.md"):  # transcripts only; never rewrite the agent's own instructions
+        return path
+    from .realcalls import learn_names, scrub_names
+    text = path.read_text()
+    names = learn_names(text)
+    phones = [m.group(0) for m in PHONE.finditer(text) if not FICTIONAL.search(m.group(0))]
+    if not names and not phones:
+        return path
+    clean = scrub_names(text, names)
+    for ph in phones:
+        clean = clean.replace(ph, "[PHONE]")
+    safe = path.with_name(path.stem + ".sent" + path.suffix)
+    safe.write_text(clean)
+    log(f"  privacy check: scrubbed {len(names)} name(s) and {len(phones)} number(s) from {path.name} before upload")
+    return safe
+
+
 def run_harnessrouter(client: Client, prompt: Path, failures: Path, shop: Path, log=print) -> Fix:
     files = [(prompt, "prompt.md"), (failures, "failures.md"), (shop, "shop.json")]
     task = TASK
@@ -80,6 +104,7 @@ def run_on_harnessrouter(client: Client, system_prompt: str, task: str, files: l
         harness_name = config.HARNESS_NAME + " [any agent]"
     harness_id = client.ensure_harness(system_prompt, harness_name)
     log(f"  harness: {harness_id}")
+    files = [(outgoing_check(path, log), name) for path, name in files]
     ids = [client.upload(path, name) for path, name in files]
     log("  uploaded " + ", ".join(name for _, name in files))
     started = client.start(harness_id, task, ids)

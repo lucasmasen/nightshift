@@ -817,6 +817,27 @@ class NameLearningTests(unittest.TestCase):
         self.assertNotIn("Caller:", r._protect_labels(t))
 
 
+class OutgoingCheckTests(unittest.TestCase):
+    def test_scrubs_transcripts_only(self):
+        from nightshift import fixer
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "failures.md"
+            f.write_text("Godfrey: What's your name?\nCaller: Dana.\nGodfrey: Thanks, Dana.\n"
+                         "Caller: 415 867 5309, or the test one 415-555-0123\n")
+            out = fixer.outgoing_check(f, log=lambda m: None)
+            self.assertEqual(out.name, "failures.sent.md")
+            sent = out.read_text()
+            self.assertNotIn("Dana", sent)
+            self.assertNotIn("867", sent)
+            self.assertIn("415-555-0123", sent)  # fictional range kept
+            p = Path(d) / "prompt.before.md"
+            p.write_text("Call the shop at 415 867 5309.")
+            self.assertEqual(fixer.outgoing_check(p, log=lambda m: None), p)  # instructions never rewritten
+            clean = Path(d) / "calls.md"
+            clean.write_text("Caller: [NAME] here, 415 555 0199\n")
+            self.assertEqual(fixer.outgoing_check(clean, log=lambda m: None), clean)
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve
