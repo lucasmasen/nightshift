@@ -52,6 +52,24 @@ def needs_verify() -> list[Path]:
             and s.get("mode") != "agent"]
 
 
+CLOSED = ("Don't approve", "Not better", "Nightshift's fix was rejected", "Fix rejected", "Combined fix rejected")
+
+
+def waiting_on_person() -> Path | None:
+    """A fix still waiting for Lucas to approve or reject. While one waits, no new fixes are stacked: two fixes built
+    on the same base clash when either goes live (11/17 lesson). Calls aren't marked reviewed, so nothing is lost."""
+    base = latest_approved()
+    for d, s in dashboard.nights():
+        if base and s.get("builds_on") != base.name:
+            continue  # built on something older than the current approved fix: stale, not waiting
+        if (s.get("diff") and not s.get("approved") and not s.get("rejected") and not s.get("superseded_by")
+                and not s.get("guard_problems") and s.get("mode") != "agent"
+                and (s.get("trace") or {}).get("where") != "mock"
+                and not str(s.get("verdict", "")).startswith(CLOSED)):
+            return d
+    return None
+
+
 def latest_approved() -> Path | None:
     for d, s in dashboard.nights():  # newest first
         if s.get("approved") and s.get("mode") not in ("real", "agent"):
@@ -79,7 +97,7 @@ def _item(title: str, code: int, out: str, night: Path | None) -> dict:
     return {"title": title, "night": None, "summary": None, "note": note}
 
 
-def run(real_days: int = 1, max_cases: int = 4, send_email: bool = True, log=print) -> list[dict]:
+def run(real_days: int = 3, max_cases: int = 4, send_email: bool = True, log=print) -> list[dict]:
     date = datetime.now().strftime("%Y-%m-%d")
     log(f"Nightshift nightly {datetime.now():%Y-%m-%d %H:%M}")
     items: list[dict] = []
@@ -98,20 +116,26 @@ def run(real_days: int = 1, max_cases: int = 4, send_email: bool = True, log=pri
                       "note": ("Skipped: today's test budget was already used." if "cap" in out.lower() or code == 2
                                else (out.strip().splitlines() or ["(no output)"])[-1][:240])})
 
-    code, out, night = _run(["night", "--real-days", str(real_days), "--new-only", "--max-cases", "3", "--guards", "2"], log)
-    if "No new real calls" in out or (night and (json.loads((night / "summary.json").read_text())
-                                                 .get("baseline_total") or 0) == 0):
-        items.append({"title": "Real calls to the demo line", "night": None, "summary": None,
-                      "note": "No one called the demo line since yesterday."})
+    waiting = waiting_on_person()
+    if waiting:
+        items.append({"title": "New fixes", "night": waiting.name, "summary": None,
+                      "note": f"Paused: {waiting.name} is waiting for you to approve or reject it. New calls wait too "
+                              "(they're reviewed after you decide), so two fixes never clash."})
     else:
-        items.append(_item("Real calls to the demo line", code, out, night))
+        code, out, night = _run(["night", "--real-days", str(real_days), "--new-only", "--max-cases", "3", "--guards", "2"], log)
+        if "No new real calls" in out or (night and (json.loads((night / "summary.json").read_text())
+                                                     .get("baseline_total") or 0) == 0):
+            items.append({"title": "Real calls to the demo line", "night": None, "summary": None,
+                          "note": "No one called the demo line since yesterday."})
+        else:
+            items.append(_item("Real calls to the demo line", code, out, night))
 
-    args = ["night", "--max-cases", str(max_cases)]
-    base = latest_approved()
-    if base:
-        args += ["--on-top-of", str(base)]
-    code, out, night = _run(args, log)
-    items.append(_item("Simulated calls" + (f" (building on approved {base.name})" if base else ""), code, out, night))
+        args = ["night", "--max-cases", str(max_cases)]
+        base = latest_approved()
+        if base:
+            args += ["--on-top-of", str(base)]
+        code, out, night = _run(args, log)
+        items.append(_item("Simulated calls" + (f" (building on approved {base.name})" if base else ""), code, out, night))
 
     from . import agents
     for name, entry in agents.registered().items():

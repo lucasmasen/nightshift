@@ -912,6 +912,30 @@ class SharedBaselineTests(unittest.TestCase):
                 config.RUNS = old
 
 
+class OneFixAtATimeTests(unittest.TestCase):
+    def test_waiting_only_counts_fixes_on_the_current_approved(self):
+        from nightshift import config, nightly
+        with tempfile.TemporaryDirectory() as d:
+            old = config.RUNS
+            config.RUNS = Path(d)
+            try:
+                for name, s in {
+                    "2026-11-16-180000": {"diff": "+a", "approved": {"by": "lucas"}},
+                    "2026-11-16-190000": {"diff": "+b", "mode": "real", "verdict": "Better, could be luck"},  # stale
+                    "2026-11-17-170000": {"diff": "+c", "builds_on": "2026-11-16-180000", "verdict": "Fix proposed"},
+                }.items():
+                    (Path(d) / name).mkdir()
+                    (Path(d) / name / "summary.json").write_text(json.dumps(s))
+                self.assertEqual(nightly.waiting_on_person().name, "2026-11-17-170000")
+                f = Path(d) / "2026-11-17-170000" / "summary.json"
+                s = json.loads(f.read_text())
+                s["verdict"] = "Don't approve: x dropped"
+                f.write_text(json.dumps(s))
+                self.assertIsNone(nightly.waiting_on_person())  # the proof closed it
+            finally:
+                config.RUNS = old
+
+
 class TryPageTests(unittest.TestCase):
     def test_split_and_validate(self):
         from nightshift import serve
