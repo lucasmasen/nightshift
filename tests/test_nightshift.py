@@ -1069,3 +1069,26 @@ class FillProofTests(unittest.TestCase):
             self.assertIn("> overnight a fix. proven: 3 of 8 → 7 of 8", xd.read_text())
             self.assertIn("room for [result]", xd.read_text())
             self.assertTrue((night / "fill-proof-backup" / "pitch.md").exists())
+
+
+class BlockedStoryTests(unittest.TestCase):
+    def test_blocked_fix_is_told_as_blocked(self):
+        from nightshift import config, export
+        with tempfile.TemporaryDirectory() as d:
+            old = config.RUNS
+            config.RUNS = Path(d)
+            try:
+                n = Path(d) / "2026-11-17-173940"
+                n.mkdir()
+                (n / "summary.json").write_text(json.dumps({
+                    "mode": "real", "diff": "x", "baseline_total": 4, "baseline_passed": 0,
+                    "agent_summary": {"summary": "Added rules."}, "verdict": "Don't approve: burst_pipe dropped",
+                    "broke": ["burst_pipe"], "before": {"passed": 31, "total": 44, "cases": {"burst_pipe": [4, 4]}},
+                    "after": {"passed": 24, "total": 44, "cases": {"burst_pipe": [1, 4]}}}))
+                out = export.real_call_story()
+            finally:
+                config.RUNS = old
+        self.assertIn("blocked the fix", out)
+        self.assertIn("burst pipe call that always passed fell to 1/4", out)
+        self.assertIn("What it tried", out)
+        self.assertNotIn("Nothing went live", out)

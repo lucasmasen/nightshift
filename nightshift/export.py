@@ -72,15 +72,23 @@ def real_call_story() -> str:
         b, a = s.get("before") or {}, s.get("after") or {}
         proof = (f"Proof on fresh test calls: {b['passed']}/{b['total']} before, {a['passed']}/{a['total']} after."
                  if a else "Proof: not run yet (it runs on the next day's test budget).")
+        if a and str(s.get("verdict", "")).startswith("Don't approve"):
+            drops = [(c, (b.get("cases") or {}).get(c), (a.get("cases") or {}).get(c)) for c in s.get("broke") or []]
+            worst = max((d for d in drops if d[1] and d[2]), key=lambda d: d[1][0] - d[2][0], default=None)
+            proof = (f"Then Nightshift's own check blocked the fix: {b['passed']}/{b['total']} test calls passed "
+                     f"before, {a['passed']}/{a['total']} after"
+                     + (f", and a {html.escape(worst[0].replace('_', ' '))} call that always passed fell to "
+                        f"{worst[2][0]}/{worst[2][1]}" if worst and worst[1][0] == worst[1][1] else "")
+                     + ". It never reached the phone line; what went wrong was handed to the next night's fix agent.")
         twins = s.get("twin_tests") or []
         return (f"<h2 style='margin-top:34px'>{'A real person' if total == 1 else 'Real people'} called it</h2><p>"
                 f"{total} real call{'' if total == 1 else 's'} to the demo line, {wrong} went wrong. The fix agent read "
                 f"the whole call{'' if total == 1 else 's'}, names and "
-                f"numbers scrubbed first. What it changed: {html.escape(what)}</p><p>"
+                f"numbers scrubbed first. {'What it tried' if 'blocked' in proof else 'What it changed'}: {html.escape(what)}</p><p>"
                 + (("The call became a permanent test" if len(twins) == 1 else f"Each call became a permanent test "
                     f"({len(twins)} in all)") + ": the caller's own words with made-up details, re-run against every "
                    "future fix. " if twins else "")
-                + f"{proof} Nothing went live.</p>")
+                + (f"{proof}</p>" if "blocked" in proof else f"{proof} Nothing went live.</p>"))
     return ""
 
 
