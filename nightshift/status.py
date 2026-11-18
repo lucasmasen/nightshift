@@ -37,12 +37,21 @@ def waiting(nights) -> list[tuple[Path, dict]]:
 
 
 def run(check_calls: bool = False, log=print) -> int:
+    from . import nightly
     nights = dashboard.nights()
-    w = waiting(nights)
-    log("Waiting on you:" if w else "Waiting on you: nothing.")
-    for d, s in w:
-        log(f"  {d.name}  {str(s.get('verdict'))[:110]}")
-        log(f"     open http://127.0.0.1:8765/night/{d.name}")
+    cand = nightly.waiting_on_person()
+    if cand:
+        s = dashboard.load(cand)
+        proven = bool(s.get("after"))
+        log(f"Waiting on you: {cand.name}  {str(s.get('verdict'))[:110]}")
+        log(f"     {'proven: read it and approve or reject' if proven else 'not proven yet: the proof runs on the next test budget'}"
+            f"  ·  http://127.0.0.1:8765/night/{cand.name}")
+        log("     New fixes are paused until you decide (calls wait, nothing is lost).")
+    else:
+        log("Waiting on you: nothing.")
+    pending = nightly.pending_proofs()
+    if pending:
+        log("Proofs queued: " + ", ".join(d.name for d in pending))
     b = sim_budget()
     if b:
         n, spent, cap = b
