@@ -73,8 +73,9 @@ def real_call_story() -> str:
         proof = (f"Proof on fresh test calls: {b['passed']}/{b['total']} before, {a['passed']}/{a['total']} after."
                  if a else "Proof: not run yet (it runs on the next day's test budget).")
         twins = s.get("twin_tests") or []
-        return (f"<h2 style='margin-top:34px'>A real person called it</h2><p>{total} real call"
-                f"{'' if total == 1 else 's'} to the demo line, {wrong} went wrong. The fix agent read the whole call, names and "
+        return (f"<h2 style='margin-top:34px'>{'A real person' if total == 1 else 'Real people'} called it</h2><p>"
+                f"{total} real call{'' if total == 1 else 's'} to the demo line, {wrong} went wrong. The fix agent read "
+                f"the whole call{'' if total == 1 else 's'}, names and "
                 f"numbers scrubbed first. What it changed: {html.escape(what)}</p><p>"
                 + (("The call became a permanent test" if len(twins) == 1 else f"Each call became a permanent test "
                     f"({len(twins)} in all)") + ": the caller's own words with made-up details, re-run against every "
