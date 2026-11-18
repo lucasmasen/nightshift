@@ -69,7 +69,9 @@ def restack(night: Path, onto: Path, client, log=print) -> Path:
     summary.update(date=out.name, builds_on=onto.name, restacked_from=night.name, diff=diff, guard_problems=problems,
                    agent_report=fix.report, agent_summary=fix.summary, trace=fix.trace,
                    verdict=("Fix rejected by the safety check." if problems else
-                            f"Redone on top of {onto.name}. Not re-tested yet: the proof runs on the next test budget."))
+                            f"Fix for {s.get('baseline_total', 0)} real call(s), built on the approved fix from {onto.name[:10]} "
+                            f"({guard.changed_lines(base, fix.prompt)} lines). Not re-tested yet: the proof runs on the "
+                            "next test budget."))
     (out / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
     if not problems:
         s["superseded_by"] = out.name
