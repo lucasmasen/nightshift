@@ -1200,3 +1200,13 @@ class KnownBreaksTests(unittest.TestCase):
                 self.assertEqual(nightly.known_breaks(), ["burst_pipe"])
             finally:
                 config.RUNS = old
+
+
+class UnprovenSlidesTests(unittest.TestCase):
+    def test_no_approve_button_before_the_proof(self):
+        from nightshift import stage
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "summary.json").write_text(json.dumps({"verdict": "Fix proposed", "baseline_total": 2}))
+            h = stage.render(Path(d))
+        self.assertNotIn("id='approve'", h)
+        self.assertIn("waits for its proof", h)

@@ -165,7 +165,10 @@ def pretty_case(name: str) -> str:
     return name.replace("_", " ")
 
 
-def _ending(blocked: bool, approve_button: str) -> str:
+def _ending(blocked: bool, approve_button: str, proven: bool = True) -> str:
+    if not proven:
+        return ("<section><div class='k'>7am</div><h1>Nothing went live.</h1><h2 class='mute'>The fix waits for its "
+                "proof on fresh test calls, then for a person.</h2></section>")
     if blocked:
         return ("<section><div class='k'>7am</div><h1>Nightshift blocked its own fix.</h1><h2 class='mute'>Nothing went "
                 "live. What went wrong goes to the next night's agent.</h2></section>")
@@ -254,7 +257,7 @@ button.done{{background:var(--c)}} .cap{{position:fixed;left:0;right:0;bottom:0;
 <div class="mute" style="margin-top:16px">Safety check: disclosure untouched, placeholders kept, under 30 lines.</div></section>
 <section><div class="k">Proof · same calls, before and after</div><h2>{"<span class='err'>Blocked.</span> " if blocked else ""}{score}</h2><div class="mute" style="margin:-12px 0 18px">{evidence}</div>{full}{"".join(bars)}
 <div class="legend">grey = before · green = after</div></section>
-{_ending(blocked, approve_button)}
+{_ending(blocked, approve_button, proven=bool(a))}
 {f'<div class="cap">{html.escape(caption)}</div>' if caption else '<div class="hint">space / → next · ← back</div>'}
 <script>
 const s=[...document.querySelectorAll('section')];let i=0;
