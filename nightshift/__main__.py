@@ -159,11 +159,21 @@ def night(args: argparse.Namespace) -> int:
         summary["verdict"] = "Fix proposed and passed the safety check. Not re-tested yet: the proof runs on the next test budget."
         return finish(out, summary)
     cases = failed + pick_guard_cases(base, failed, args.guards)
+    cases += _known_breaks(summary, cases)
     try:
         prove(summary, cases, old, fix.prompt, args.repeat)
     except retest.Refused as e:
         summary["verdict"] = f"Fix proposed, but the re-test was refused by the $2/day simulator cap: {e}"
     return finish(out, summary)
+
+
+def _known_breaks(summary: dict, cases: list[str]) -> list[str]:
+    """Add the cases an earlier blocked fix broke, so the same regression is caught again (logged in the summary)."""
+    from . import nightly
+    extra = [c for c in nightly.known_breaks() if c not in cases]
+    if extra:
+        summary["regression_cases"] = extra
+    return extra
 
 
 DEFAULT_GUARDS = ["book_basic", "reschedule_after_booking", "skeptic_badmouth_competitors"]
@@ -234,6 +244,7 @@ def real_night(args: argparse.Namespace, out: Path, stamp: str) -> int:
     summary["twin_tests"] = made
     cases = made + [c for c in targets if c not in made] + [g for g in DEFAULT_GUARDS[:max(0, args.guards)]
                                                             if g not in targets]
+    cases += _known_breaks(summary, cases)
     summary["retest_cases"] = cases
     if args.no_retest:
         summary["verdict"] = "Fix proposed and passed the safety check. Not re-tested yet: the proof runs on the next test budget."

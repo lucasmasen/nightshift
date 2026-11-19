@@ -1182,3 +1182,21 @@ class DemoLineCheckTests(unittest.TestCase):
         self.assertFalse(preflight.demo_line_line(("2026-11-18T23:00:00Z", "call.rejected.insufficient-credits"), now)[0])
         self.assertTrue(preflight.demo_line_line(("2026-11-19T00:00:00Z", "customer-ended-call"), now)[0])
         self.assertIsNone(preflight.demo_line_line(None, now)[0])
+
+
+class KnownBreaksTests(unittest.TestCase):
+    def test_cases_a_blocked_fix_broke_are_remembered(self):
+        from nightshift import config, nightly
+        with tempfile.TemporaryDirectory() as d:
+            old = config.RUNS
+            config.RUNS = Path(d)
+            try:
+                for name, verdict, after in (("2026-11-17-1", "Don't approve: x", {"burst_pipe": [1, 4], "a": [3, 4]}),
+                                             ("2026-11-17-2", "Ready: better", {"b": [0, 4]})):
+                    (Path(d) / name).mkdir()
+                    (Path(d) / name / "summary.json").write_text(json.dumps({
+                        "verdict": verdict, "before": {"cases": {"burst_pipe": [4, 4], "a": [4, 4], "b": [4, 4]}},
+                        "after": {"cases": after}}))
+                self.assertEqual(nightly.known_breaks(), ["burst_pipe"])
+            finally:
+                config.RUNS = old

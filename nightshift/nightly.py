@@ -55,6 +55,24 @@ def needs_verify() -> list[Path]:
 CLOSED = ("Don't approve", "Not better", "Nightshift's fix was rejected", "Fix rejected", "Combined fix rejected")
 
 
+def known_breaks(limit: int = 3) -> list[str]:
+    """Cases an earlier fix broke (lost 2 or more passes in a proof that blocked it), newest first. Every later
+    proof re-tests them, so a mistake Nightshift already caught once can't sneak back in with the next fix."""
+    out: list[str] = []
+    for f in sorted(config.RUNS.glob("20*/summary.json"), reverse=True) if config.RUNS.exists() else []:
+        try:
+            s = json.loads(f.read_text())
+        except ValueError:
+            continue
+        if not str(s.get("verdict", "")).startswith(CLOSED):
+            continue
+        b, a = (s.get("before") or {}).get("cases") or {}, (s.get("after") or {}).get("cases") or {}
+        for c, (ap, _) in sorted(a.items()):
+            if c in b and b[c][0] - ap >= 2 and c not in out:
+                out.append(c)
+    return out[:limit]
+
+
 def waiting_on_person() -> Path | None:
     """A fix still waiting for Lucas to approve or reject. While one waits, no new fixes are stacked: two fixes built
     on the same base clash when either goes live (11/17 lesson). Calls aren't marked reviewed, so nothing is lost."""
