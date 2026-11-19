@@ -132,6 +132,19 @@ def seen_ids() -> set[str]:
     return out
 
 
+def last_call() -> tuple[str, str] | None:
+    """(when, how it ended) for the demo line's newest call, or None if Vapi can't be read. Read-only."""
+    try:
+        from . import vapi_import
+        state = json.loads((DF / "demo_line" / "state.json").read_text())
+        env = dict(ln.split("=", 1) for ln in (DF / ".env").read_text().splitlines() if "=" in ln and not ln.startswith("#"))
+        key = env.get("VOICE_PLATFORM_API_KEY", "").strip().strip('"').strip("'")
+        calls = vapi_import._get("/call", key, {"assistantId": state["assistant_id"], "limit": 1})
+        return (calls[0].get("createdAt", ""), calls[0].get("endedReason") or "") if calls else None
+    except Exception:  # noqa: BLE001 - preflight only reports it
+        return None
+
+
 def full_transcripts(days: int, skip: set[str] | None = None) -> str:
     """The window's whole calls, so the redactor learns every name a caller gave ("this is X") before it cleans the
     report's short excerpts, where a name can appear with nothing marking it as one. Read-only; empty if it can't."""

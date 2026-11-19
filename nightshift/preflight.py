@@ -69,6 +69,29 @@ def build_offline(nights: list[Path]) -> Path:
     return OFFLINE / "index.html"
 
 
+def demo_line_line(last: tuple[str, str] | None | bool = False, now=None) -> tuple[bool | None, str]:
+    """When the demo line last took a call. Nightshift can't see Vapi credit, so a quiet line is a yellow line:
+    call it once before going on stage. A call that ended for a billing reason is red."""
+    from datetime import datetime, timezone
+    from . import realcalls
+    last = realcalls.last_call() if last is False else last
+    if not last:
+        return None, "demo line: couldn't read its calls from Vapi; call it once to check it picks up"
+    when, why = last
+    if any(w in why.lower() for w in ("credit", "billing", "payment", "insufficient")):
+        return False, f"demo line: the last call ended with '{why}'. Add Vapi credit, or demo with the Try page"
+    try:
+        t = datetime.fromisoformat(when.replace("Z", "+00:00"))
+        hours = ((now or datetime.now(timezone.utc)) - t).total_seconds() / 3600
+    except ValueError:
+        return None, "demo line: last call time unreadable; call it once to check it picks up"
+    local = t.astimezone().strftime("%a %-I:%M%p").replace("AM", "am").replace("PM", "pm")
+    if hours <= 3:
+        return True, f"demo line answered a call {hours:.0f}h ago ({local})"
+    return None, (f"demo line: last call {local}, {hours:.0f}h ago. Call it once before going on stage "
+                  "(Vapi credit can't be checked from here)")
+
+
 def run(log=print) -> int:
     rows: list[tuple[bool | None, str]] = []
 
@@ -88,8 +111,12 @@ def run(log=print) -> int:
     real = [d for d in nights if dashboard.load(d).get("mode") == "real"]
     if real:
         s = dashboard.load(real[0])
-        check(True if s.get("after") else None, f"real-call fix proven ({real[0].name})" + ("" if s.get("after") else
+        blocked = str(s.get("verdict", "")).startswith(("Don't approve", "Not better"))
+        check(True if s.get("after") else None,
+              (f"real-call fix tested and blocked by its own check ({real[0].name}): show it as 'it stopped itself'"
+               if blocked else f"real-call fix proven ({real[0].name})") + ("" if s.get("after") else
               ": not yet, it runs on the next test budget"))
+    check(*demo_line_line())
     if not _port_open(8765):
         from . import nightly
         nightly.ensure_server(log=lambda m: None)

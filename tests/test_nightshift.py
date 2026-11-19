@@ -1169,3 +1169,16 @@ class BlockedSlidesTests(unittest.TestCase):
         self.assertNotIn("chance this is luck", h)
         self.assertIn("burst pipe<small>got worse", h)
         self.assertIn("swear<small>already passing", h)
+
+
+class DemoLineCheckTests(unittest.TestCase):
+    def test_quiet_line_is_yellow_billing_is_red_recent_is_green(self):
+        from datetime import datetime, timezone
+        from nightshift import preflight
+        now = datetime(2026, 11, 19, 1, 0, tzinfo=timezone.utc)
+        ok, msg = preflight.demo_line_line(("2026-11-18T03:57:00.000Z", "customer-ended-call"), now)
+        self.assertIsNone(ok)
+        self.assertIn("Call it once", msg)
+        self.assertFalse(preflight.demo_line_line(("2026-11-18T23:00:00Z", "call.rejected.insufficient-credits"), now)[0])
+        self.assertTrue(preflight.demo_line_line(("2026-11-19T00:00:00Z", "customer-ended-call"), now)[0])
+        self.assertIsNone(preflight.demo_line_line(None, now)[0])
