@@ -1145,7 +1145,7 @@ class OneFixPerNightTests(unittest.TestCase):
                     mock.patch.object(nightly, "pending_proofs", return_value=[]), \
                     mock.patch.object(nightly, "needs_verify", return_value=[]), \
                     mock.patch.object(nightly, "waiting_on_person", return_value=None), \
-                    mock.patch.object(nightly, "ensure_server"), \
+                    mock.patch.object(nightly, "ensure_server"), mock.patch.object(nightly, "_stay_awake"), \
                     mock.patch.object(agents, "registered", return_value={}):
                 items = nightly.run(send_email=False, log=lambda m: None)
         self.assertEqual(len(calls), 1)

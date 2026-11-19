@@ -115,9 +115,20 @@ def _item(title: str, code: int, out: str, night: Path | None) -> dict:
     return {"title": title, "night": None, "summary": None, "note": note}
 
 
+def _stay_awake() -> None:
+    """Keep the Mac from idle-sleeping until this run ends (a sleeping Mac froze a proof mid-run on 11/18)."""
+    import os
+    try:
+        subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
+
+
 def run(real_days: int = 3, max_cases: int = 4, send_email: bool = True, log=print) -> list[dict]:
     date = datetime.now().strftime("%Y-%m-%d")
     log(f"Nightshift nightly {datetime.now():%Y-%m-%d %H:%M}")
+    _stay_awake()
     items: list[dict] = []
 
     for d in pending_proofs():
