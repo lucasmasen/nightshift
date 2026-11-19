@@ -515,7 +515,7 @@ class NightlyMailTests(unittest.TestCase):
             "twin_tests": ["real_20261118_abc123"], "agent_summary": {"summary": "stopped the number loop"}}}
         _, text, _ = mail.render([item], "2026-11-18")
         self.assertIn("3 real calls to the demo line, 2 went wrong.", text)
-        self.assertIn("real_20261118_abc123", text)
+        self.assertIn("1 of these calls is now a permanent test,", text)
         self.assertIn("stopped the number loop", text)
 
     def test_send_without_gmail_saves_file(self):
@@ -1210,3 +1210,17 @@ class UnprovenSlidesTests(unittest.TestCase):
             h = stage.render(Path(d))
         self.assertNotIn("id='approve'", h)
         self.assertIn("waits for its proof", h)
+
+
+class BlockedMailTests(unittest.TestCase):
+    def test_blocked_proof_email_says_blocked_not_approve(self):
+        from nightshift import mail
+        s = {"mode": "real", "verdict": "Don't approve: burst_pipe dropped", "baseline_total": 6, "baseline_passed": 0,
+             "agent_summary": {"summary": "Two rules."}, "twin_tests": ["a", "b"],
+             "before": {"passed": 30, "total": 44, "cases": {"burst_pipe": [4, 4]}},
+             "after": {"passed": 26, "total": 44, "cases": {"burst_pipe": [1, 4]}}}
+        subj, text, body = mail.render([{"title": "Proof", "night": "n1", "summary": s}], "2026-11-19")
+        self.assertIn("Nightshift blocked its own fix: burst pipe lost 2 or more passes", text)
+        self.assertIn("What it tried", text)
+        self.assertNotIn("Approve or reject", text)
+        self.assertIn("2 of these calls are now permanent tests", text)

@@ -44,26 +44,34 @@ def render(items: list[dict], date: str) -> tuple[str, str, str]:
         b, a = s.get("before") or {}, s.get("after") or {}
         score = f"{b['passed']}/{b['total']} -> {a['passed']}/{a['total']} on fresh calls" if a else ""
         link = f"{LOCAL}/night/{i['night']}" if i.get("night") else ""
+        blocked = bool(a) and str(s.get("verdict", "")).startswith(("Don't approve", "Not better"))
+        if blocked:
+            drops = [c for c, (ap, _) in (a.get("cases") or {}).items()
+                     if (b.get("cases") or {}).get(c, (0, 0))[0] - ap >= 2]
+            verdict = ("Nightshift blocked its own fix: " + (", ".join(c.replace("_", " ") for c in drops) or "a call")
+                       + " lost 2 or more passes. Nothing to approve; the next night's agent gets what went wrong.")
         what = (s.get("agent_summary") or {}).get("summary") or ""
         body_lines = _diff_lines(s.get("diff", ""), limit=10_000)
         n_changed = max(sum(d.startswith("+") for d in body_lines), sum(d.startswith("-") for d in body_lines))
-        diff = ([f"What it changed: {what}"] if what else []) + ([f"{n_changed} lines of the instructions changed."] if n_changed else [])
+        diff = ([f"{'What it tried' if blocked else 'What it changed'}: {what}"] if what else []) + ([f"{n_changed} lines of the instructions changed."] if n_changed else [])
         if s.get("mode") == "real":
             total = s.get("baseline_total", 0)
             wrong = total - s.get("baseline_passed", 0)
             diff.insert(0, f"{total} real call{'' if total == 1 else 's'} to the demo line, {wrong} went wrong.")
             if s.get("twin_tests"):
-                diff.append("New permanent test(s) from those calls: " + ", ".join(s["twin_tests"]) + ".")
+                n = len(s["twin_tests"])
+                diff.append(f"{n} of these calls {'is now a permanent test' if n == 1 else 'are now permanent tests'}, "
+                            "re-run against every future fix.")
         if s.get("approved"):
             diff.append(f"Already approved by {s['approved'].get('by')}.")
         text += [f"## {i['title']}", verdict] + ([score] if score else []) + diff + (
-            [f"Approve or reject on your Mac: {link}"] if link else []) + [""]
+            [f"{'See it' if blocked else 'Approve or reject'} on your Mac: {link}"] if link else []) + [""]
         rows.append(
             f"<h3 style='margin:22px 0 6px'>{html.escape(i['title'])}</h3>"
             f"<p style='margin:0 0 6px;font-weight:600'>{html.escape(verdict)}</p>"
             + (f"<p style='margin:0 0 8px;color:#555'>{html.escape(score)}</p>" if score else "")
             + "".join(f"<p style='margin:0 0 6px'>{html.escape(d)}</p>" for d in diff)
-            + (f"<p><a href='{link}'>Approve or reject (on your Mac)</a></p>" if link else ""))
+            + (f"<p><a href='{link}'>{'See it' if blocked else 'Approve or reject'} (on your Mac)</a></p>" if link else ""))
     text += ["Nothing went live. A person approves every change."]
     body = (f"<div style='font:15px/1.5 -apple-system,Segoe UI,sans-serif;max-width:640px'>"
             f"<h2 style='margin:0;color:#17331F'>Nightshift &middot; {html.escape(date)}</h2>{''.join(rows)}"
