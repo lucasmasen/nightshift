@@ -1167,5 +1167,5 @@ class BlockedSlidesTests(unittest.TestCase):
         self.assertIn("Nightshift blocked its own fix.", h)
         self.assertNotIn("id='approve'", h)
         self.assertNotIn("chance this is luck", h)
-        self.assertIn("burst_pipe<small>got worse", h)
+        self.assertIn("burst pipe<small>got worse", h)
         self.assertIn("swear<small>already passing", h)

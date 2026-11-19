@@ -155,6 +155,16 @@ def _diff(diff: str) -> str:
 BLOCKED = ("Don't approve", "Not better")
 
 
+def pretty_case(name: str) -> str:
+    """Test names as a judge reads them: "real_20261117_01a1ebe6" -> "real call, 11/17 · ebe6", "burst_pipe" -> "burst pipe"."""
+    m = re.fullmatch(r"real_(\d{4})(\d{2})(\d{2})_(\w+)", name)
+    if m:
+        return f"real call, {int(m.group(2))}/{int(m.group(3))} · {m.group(4)[-4:]}"
+    if name.startswith("real_"):
+        return "real call (" + name[5:].replace("_", " ") + ")"
+    return name.replace("_", " ")
+
+
 def _ending(blocked: bool, approve_button: str) -> str:
     if blocked:
         return ("<section><div class='k'>7am</div><h1>Nightshift blocked its own fix.</h1><h2 class='mute'>Nothing went "
@@ -183,7 +193,7 @@ def render(night_dir: Path, start: int = 0, caption: str = "", rehearse: bool = 
         bp, bt = b.get("cases", {}).get(c, (0, 0))
         ap, at = a.get("cases", {}).get(c, (0, 0))
         tag = ("got worse" if c in broke else "fixed" if c in s.get("failed_cases", []) else "already passing")
-        bars.append(f"<div class='row'><div class='name'>{html.escape(c)}<small>{tag}</small></div>"
+        bars.append(f"<div class='row'><div class='name'>{html.escape(pretty_case(c))}<small>{tag}</small></div>"
                     f"<div class='bar'><i class='b' style='width:{100 * bp / bt if bt else 0:.0f}%'></i></div>"
                     f"<div class='bar'><i class='a{' bad' if c in broke else ''}' style='width:{100 * ap / at if at else 0:.0f}%'></i></div>"
                     f"<div class='n'>{bp}/{bt} &rarr; {ap}/{at}</div></div>")
